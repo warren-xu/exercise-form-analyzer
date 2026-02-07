@@ -1,7 +1,8 @@
 .venv/
 venv/
-
+eleven_test.py
 __pycache__/
 .pytest_cache/
 .env
 node_modules/
+.mp3
