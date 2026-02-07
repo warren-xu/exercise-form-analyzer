@@ -6,6 +6,15 @@ import type { RepSummary, AssistantOutput } from './types';
 
 const API_BASE = '/api';
 
+// Helper to get auth header
+function getAuthHeaders(accessToken?: string): HeadersInit {
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  return headers;
+}
+
 export async function healthCheck(): Promise<{ status: string }> {
   const res = await fetch(`${API_BASE}/health`);
   if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
@@ -31,11 +40,12 @@ function toRepPayload(rep: RepSummary, sessionId: string) {
 export async function getSetCoach(
   sessionId: string,
   reps: RepSummary[],
-  setLevelSummary?: { worst_issues?: string[]; trends?: string[]; consistency_note?: string }
+  setLevelSummary?: { worst_issues?: string[]; trends?: string[]; consistency_note?: string },
+  accessToken?: string
 ): Promise<AssistantOutput> {
   const res = await fetch(`${API_BASE}/coach/set`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(accessToken),
     body: JSON.stringify({
       session_id: sessionId,
       rep_count: reps.length,
@@ -48,4 +58,30 @@ export async function getSetCoach(
     throw new Error(err.detail || err.error || `Set coach failed: ${res.status}`);
   }
   return res.json();
+}
+
+export interface SessionHistory {
+  id: string;
+  user_id: string;
+  user_email?: string;
+  session_id: string;
+  timestamp: string;
+  rep_count: number;
+  assistant_feedback?: AssistantOutput;
+}
+
+export async function getUserHistory(accessToken: string, limit: number = 10): Promise<SessionHistory[]> {
+  const res = await fetch(`${API_BASE}/history?limit=${limit}`, {
+    headers: getAuthHeaders(accessToken),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch history: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteSession(sessionId: string, accessToken: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/history/${sessionId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(accessToken),
+  });
+  if (!res.ok) throw new Error(`Failed to delete session: ${res.status}`);
 }

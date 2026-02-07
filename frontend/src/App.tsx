@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAuth0 } from '@auth0/auth0-react';
 import { WebcamCapture } from "./WebcamCapture";
 import { OverlayRenderer } from "./OverlayRenderer";
 import { StatusCards } from "./StatusCards";
 import { CoachPanel } from "./CoachPanel";
+import { HistoricalFeedback } from "./HistoricalFeedback";
 import { initPoseLandmarker, detectPose } from "./PoseInferenceEngine";
 import { createMotionAnalysisEngine } from "./MotionAnalysisEngine";
 import { isBodyReadyForSquat } from "./bodyReadyForSquat";
@@ -26,6 +28,7 @@ function generateSessionId(): string {
 }
 
 export default function App() {
+  const { user, logout, getAccessTokenSilently } = useAuth0();
   const [phase, setPhase] = useState<AppPhase>("Ready");
   const [videoSize, setVideoSize] = useState({ width: 640, height: 480 });
   const [currentKeypoints, setCurrentKeypoints] = useState<
@@ -178,7 +181,8 @@ export default function App() {
     setAssistantLoading(true);
     setAssistantError(null);
     try {
-      const output = await getSetCoach(sessionIdRef.current, reps);
+      const token = await getAccessTokenSilently().catch(() => undefined);
+      const output = await getSetCoach(sessionIdRef.current, reps, undefined, token);
       setAssistantOutput(output);
       setPhase("SetSummary");
       stopCamera();
@@ -187,7 +191,7 @@ export default function App() {
     } finally {
       setAssistantLoading(false);
     }
-  }, [reps, stopCamera]);
+  }, [reps, stopCamera, getAccessTokenSilently]);
 
   const displayChecks =
     lastRepChecks ?? (reps.length > 0 ? reps[reps.length - 1].checks : null);
@@ -202,13 +206,45 @@ export default function App() {
         padding: 24,
       }}
     >
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>
-          Squat Form Analyzer
-        </h1>
-        <p style={{ margin: "8px 0 0", color: "var(--muted)", fontSize: 14 }}>
-          Camera: 3/4 front or side · Full body in frame · Even lighting
-        </p>
+      <header style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>
+            Squat Form Analyzer
+          </h1>
+          <p style={{ margin: "8px 0 0", color: "var(--muted)", fontSize: 14 }}>
+            Camera: 3/4 front or side · Full body in frame · Even lighting
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+          {user && (
+            <div style={{ fontSize: 14, color: "var(--muted)" }}>
+              {user.name}
+            </div>
+          )}
+          <button
+            onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+            style={{
+              padding: "8px 16px",
+              fontSize: 14,
+              backgroundColor: "transparent",
+              color: "var(--accent)",
+              border: "1px solid var(--accent)",
+              borderRadius: 4,
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = "var(--accent)";
+              e.currentTarget.style.color = "#000";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "var(--accent)";
+            }}
+          >
+            Logout
+          </button>
+        </div>
       </header>
 
       <div
@@ -311,6 +347,11 @@ export default function App() {
             error={assistantError}
           />
         </div>
+      </div>
+
+      {/* Historical Feedback Section */}
+      <div style={{ marginTop: 24 }}>
+        <HistoricalFeedback />
       </div>
     </div>
   );
