@@ -47,6 +47,11 @@ export interface RepSummary {
     heel_lift: RepCheckResult;
     asymmetry: RepCheckResult;
   };
+  /** From rep detector: depth (0–1), stability (0–1), asymmetry (0–1), min knee angle (degrees). */
+  depth_score?: number;
+  stability_score?: number;
+  asymmetry_score?: number;
+  min_knee_angle?: number;
 }
 
 export interface AssistantOutput {

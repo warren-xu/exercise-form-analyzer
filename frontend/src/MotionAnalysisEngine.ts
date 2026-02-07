@@ -74,7 +74,8 @@ export function createMotionAnalysisEngine() {
       rep_confidence: repWindow.rep_confidence,
       confidence: { pose_avg: poseAvg, warnings },
       checks,
-    };
+      ...(repWindow.depth_score !== undefined && { depth_score: repWindow.depth_score }),
+      ...(repWindow.stability_score !== undefined && { stability_score: repWindow.stability_score }),};
     repIndex += 1;
 
     return { state, repComplete: repSummary, liveChecks };
