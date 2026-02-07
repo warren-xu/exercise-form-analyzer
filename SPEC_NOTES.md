@@ -6,11 +6,9 @@ This file records decisions made where the spec was ambiguous, and options for y
 
 ## 1) Backboard.io API
 
-- **Unclear:** The exact Backboard.io base URL, auth header name, and request format were not confirmed from public docs. The backend uses:
-  - `BACKBOARD_BASE_URL` (default `https://api.backboard.io`)
-  - `BACKBOARD_API_KEY` with `X-API-Key` header
-  - `POST /v1/chat` with `multipart/form-data` and fields: `model_name`, `memory`, `web_search`, `send_to_llm`, `content`
-- **Action:** If your Backboard dashboard or docs show a different base URL, path, or body format, update `backend/app/backboard.py` and `.env` accordingly.
+- The backend uses the **official backboard-sdk** (`pip install backboard-sdk`). Flow: `BackboardClient(api_key)` → `create_assistant(name, system_prompt)` → `create_thread(assistant_id)` → `add_message(thread_id, content=form_data, llm_provider, model_name, stream=False)` → parse `response.content` into summary, cues, safety_note.
+- **Form data:** The message `content` is the same structured squat summary: rep_count, reps (each with confidence and checks: depth, knee_tracking, torso_angle, heel_lift, asymmetry), and optional set_level_summary. The assistant’s system prompt asks for JSON with summary, cues, safety_note, confidence_note.
+- **Env:** `BACKBOARD_API_KEY` (required for AI coaching), optional `BACKBOARD_LLM_PROVIDER` (default `openai`), `BACKBOARD_MODEL` (default `gpt-4o-mini`). No base URL or path — the SDK handles the endpoint.
 
 ---
 

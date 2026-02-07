@@ -1,23 +1,28 @@
 """
-Backboard.io assistant client.
-Converts structured squat analysis into human-like coaching via Backboard API.
-See https://app.backboard.io/docs — base URL and key must be configured (env).
+Backboard.io assistant client using the official SDK.
+Sends structured squat form data to an assistant and returns coaching output.
+See https://app.backboard.io/docs
 """
 import json
 import os
 import re
-import httpx
+
+from backboard import BackboardClient
+from backboard import (
+    BackboardAPIError,
+    BackboardValidationError,
+    BackboardNotFoundError,
+)
 
 from .schemas import AssistantOutput
 
 
-DEFAULT_BASE = "https://app.backboard.io/api"
+COACH_SYSTEM_PROMPT = """You are a concise gym coach assistant. You receive structured squat form analysis (depth, knee tracking, torso angle, heel lift, asymmetry) and respond with:
+1. A 1–2 sentence summary of the main takeaway.
+2. 2–4 prioritized, actionable cues (short phrases).
+3. If tracking confidence was low, add a short confidence_note suggesting the user keep feet and knees visible in frame.
 
-
-def _get_config() -> tuple[str | None, str]:
-    api_key = os.environ.get("BACKBOARD_API_KEY")
-    base_url = (os.environ.get("BACKBOARD_BASE_URL") or DEFAULT_BASE).rstrip("/")
-    return api_key, base_url
+Respond in JSON only, with keys: summary, cues (array of strings), safety_note, confidence_note (optional string). No markdown, no code fence."""
 
 
 def _build_set_coach_message(
@@ -25,6 +30,7 @@ def _build_set_coach_message(
     reps: list,
     set_level_summary: dict | None = None,
 ) -> str:
+    """Build the user message containing form data for the assistant."""
     payload = {
         "rep_count": rep_count,
         "reps": reps,
@@ -38,6 +44,7 @@ def _build_set_coach_message(
 
 
 def _parse_assistant_output(raw: str) -> AssistantOutput:
+    """Parse assistant reply (JSON or plain text) into AssistantOutput."""
     trimmed = raw.strip()
     json_match = re.search(r"\{[\s\S]*\}", trimmed)
     if json_match:
@@ -59,12 +66,24 @@ def _parse_assistant_output(raw: str) -> AssistantOutput:
     )
 
 
+def _fallback_output(reason: str, detail: str = "") -> AssistantOutput:
+    return AssistantOutput(
+        summary=reason,
+        cues=[
+            "Check BACKBOARD_API_KEY in backend/.env.",
+            "See app.backboard.io/docs if the error persists.",
+        ],
+        safety_note="Form feedback is still available from the status cards.",
+        confidence_note=detail or None,
+    )
+
+
 async def get_set_coach_response(
     rep_count: int,
     reps: list,
     set_level_summary: dict | None = None,
 ) -> AssistantOutput:
-    api_key, base_url = _get_config()
+    api_key = os.environ.get("BACKBOARD_API_KEY")
     if not api_key:
         return AssistantOutput(
             summary="Backboard API key is not configured. Set BACKBOARD_API_KEY to enable AI coaching.",
@@ -74,29 +93,37 @@ async def get_set_coach_response(
         )
 
     content = _build_set_coach_message(rep_count, reps, set_level_summary)
-    model = os.environ.get("BACKBOARD_MODEL", "gpt-4o-mini")
-    data = {
-        "model_name": model,
-        "memory": "off",
-        "web_search": "off",
-        "send_to_llm": "true",
-        "content": content,
-    }
+    llm_provider = os.environ.get("BACKBOARD_LLM_PROVIDER", "openai")
+    model_name = os.environ.get("BACKBOARD_MODEL", "gpt-4o-mini")
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.post(
-            f"{base_url}/v1/chat",
-            headers={"X-API-Key": api_key},
-            data=data,
+    try:
+        client = BackboardClient(api_key=api_key)
+
+        assistant = await client.create_assistant(
+            name="Squat Form Coach",
+            system_prompt=COACH_SYSTEM_PROMPT,
         )
 
-    if response.status_code != 200:
-        raise RuntimeError(f"Backboard API error {response.status_code}: {response.text}")
+        thread = await client.create_thread(assistant.assistant_id)
 
-    body = response.json()
-    raw = (
-        (body.get("message") or {}).get("content")
-        or body.get("content")
-        or ""
-    )
-    return _parse_assistant_output(raw)
+        response = await client.add_message(
+            thread_id=thread.thread_id,
+            content=content,
+            llm_provider=llm_provider,
+            model_name=model_name,
+            stream=False,
+        )
+
+        raw = getattr(response, "content", None) or ""
+        return _parse_assistant_output(raw)
+
+    except (BackboardNotFoundError, BackboardValidationError, BackboardAPIError) as e:
+        return _fallback_output(
+            f"Backboard API error: {e!s}",
+            detail=str(e),
+        )
+    except Exception as e:
+        return _fallback_output(
+            "Could not get coach response from Backboard.",
+            detail=str(e),
+        )

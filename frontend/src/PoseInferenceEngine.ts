@@ -1,6 +1,11 @@
 /**
  * In-browser pose inference using MediaPipe Pose Landmarker (Option A).
  * Outputs keypoints + confidence per frame.
+ *
+ * Why the skeleton can look slightly off: (1) Model was trained on varied images, not
+ * gym-specific; (2) normalized coords assume a tight crop—full-body at distance adds
+ * perspective; (3) we apply EMA smoothing so joints lag a bit; (4) lite model trades
+ * some accuracy for speed. Good enough for rep counting and form cues; not pixel-perfect.
  */
 
 import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';

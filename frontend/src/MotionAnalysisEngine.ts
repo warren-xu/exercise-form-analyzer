@@ -9,7 +9,6 @@ import { createRepDetector } from './repDetection';
 import { computeFormChecks, computeLiveChecks } from './formChecks';
 import type { RepSummary } from './types';
 import type { RepCheckResult } from './types';
-
 const LIVE_WINDOW_FRAMES = 15; // ~0.75 s at 20 fps
 
 export function createMotionAnalysisEngine() {
@@ -51,6 +50,7 @@ export function createMotionAnalysisEngine() {
     );
     const bottomIdx = repFrames.findIndex((f) => f.frameIndex === bottomFrame);
     if (bottomIdx < 0 || repFrames.length < 3) {
+      console.warn('[rep] motion engine dropped rep: missing frames', { startFrame, bottomFrame, endFrame, repFramesLen: repFrames.length, bottomIdx });
       return { state, repComplete: null, liveChecks };
     }
 

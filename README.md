@@ -53,6 +53,10 @@ Runs at `http://localhost:5173` and proxies `/api` to the backend.
 - **Backend:** `backend/.env` — `BACKBOARD_API_KEY`, `BACKBOARD_BASE_URL`, optional `BACKBOARD_MODEL`. Port is set via uvicorn (`--port 3001`).
 - **Frontend:** Thresholds and FPS in `frontend/src/constants.ts`.
 
+## How reps are detected
+
+See **docs/PIPELINE.md** for the full flow (pose → smoothing → rep detection → form checks) and why reps might not increment.
+
 ## Unclear / optional items
 
 See **SPEC_NOTES.md** for decisions and extension points (Backboard API shape, rep segmentation tuning, live vs rep-based feedback, optional session store, worker-based inference).
