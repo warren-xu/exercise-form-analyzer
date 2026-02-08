@@ -1,5 +1,6 @@
 /**
- * Squat rep detector using hip height with velocity - 3-phase state machine.
+ * Squat rep detector: descending/ascending and bottom from hip level (hipMidY).
+ * Knee angle is tracked during the rep and required to validate a real squat.
  */
 
 import type { SmoothedState } from './smoothing';
@@ -14,53 +15,79 @@ export interface RepWindow {
   rep_confidence: number;
   depth_score: number;
   stability_score: number;
-  max_depth: number;
+  asymmetry_score: number;
 }
 
-/** Minimum hip drop (Y increase) to consider "went down" */
-const MIN_DROP = 0.08; // 8cm drop to commit
-/** How much hip must rise (Y decrease) from bottom to count as standing */
-const RISE_FROM_BOTTOM = 0.06; // 6cm rise to complete
-/** Velocity window for smoothing */
-const VELOCITY_WINDOW = 5;
-/** Velocity threshold to detect direction change (in Y per frame) */
-const VELOCITY_THRESHOLD = 0.0025;
+/** Hip Y: minimum drop from start to bottom (normalized) to commit to rep */
+const MIN_HIP_DROP = 0.03;
+/** Hip Y: minimum rise from bottom to consider rep complete (normalized) */
+const MIN_HIP_RISE = 0.03;
+/** Hip velocity window (frames) for smoothing */
+const HIP_VELOCITY_WINDOW = 5;
+/** Hip velocity threshold: Y per frame to detect descent/ascent */
+const HIP_VELOCITY_THRESHOLD = 0.0015;
+/** Minimum knee flexion (degrees bent from straight) to count as a valid squat: maxKneeAngle >= this */
+const MIN_KNEE_FLEXION = 25;
 /** Minimum time for a rep (seconds) */
-const MIN_REP_DURATION_SEC = 1.0;
+const MIN_REP_DURATION_SEC = 0.75;
 /** Maximum time for a rep (seconds) */
-const MAX_REP_DURATION_SEC = 10.0;
+const MAX_REP_DURATION_SEC = 5.0;
 /** Cooldown frames after counting */
 const COOLDOWN_FRAMES = 12;
-/** How many frames to wait after detecting bottom before allowing ascent phase */
+/** Frames to wait at bottom before allowing ascent transition */
 const BOTTOM_SETTLE_FRAMES = 6;
+/** Maximum asymmetry allowed (degrees) */
+const MAX_ASYMMETRY_WARN = 15;
 
 type Phase = 'waiting' | 'descending' | 'ascending';
 
 interface FrameData {
   frameIndex: number;
   hipMidY: number;
+  kneeAngleLeft: number;
+  kneeAngleRight: number;
+  kneeAngleAvg: number;
   conf: number;
 }
 
 export function createRepDetector() {
   const history: FrameData[] = [];
-  const velocities: number[] = [];
+  const hipVelocities: number[] = [];
   const maxHistory = 150;
-  
+
   let phase: Phase = 'waiting';
   let startFrame = 0;
-  let startY = 0;
+  let startHipY = 0;
   let bottomFrame = 0;
-  let bottomY = 0;
+  let bottomHipY = 0;
+  let maxKneeAngle = 0;
   let committed = false;
   let lastCountedAtFrame = 0;
 
-  function calculateDepthScore(drop: number): number {
-    // Score based on how deep the squat was (hip drop in Y)
-    // 0.15+ (15cm) = perfect, 0.08 (8cm) = shallow
-    if (drop >= 0.15) return 1.0;
-    if (drop <= 0.08) return 0.3;
-    return 0.3 + ((drop - 0.08) / 0.07) * 0.7;
+  function calculateKneeAngle(
+    hip: [number, number],
+    knee: [number, number],
+    ankle: [number, number]
+  ): number {
+    const hipKnee = { x: knee[0] - hip[0], y: knee[1] - hip[1] };
+    const kneeAnkle = { x: ankle[0] - knee[0], y: ankle[1] - knee[1] };
+    
+    const dot = hipKnee.x * kneeAnkle.x + hipKnee.y * kneeAnkle.y;
+    const mag1 = Math.sqrt(hipKnee.x ** 2 + hipKnee.y ** 2);
+    const mag2 = Math.sqrt(kneeAnkle.x ** 2 + kneeAnkle.y ** 2);
+    
+    if (mag1 === 0 || mag2 === 0) return 180;
+    
+    const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+    return Math.acos(cosAngle) * (180 / Math.PI);
+  }
+
+  function calculateDepthScore(maxAngle: number): number {
+    // Score based on how deep the squat was
+    // 90° = perfect, 120° = shallow, 60° = very deep
+    if (maxAngle >= 90) return 1.0;
+    if (maxAngle <= 140) return 0.3;
+    return 1.0 - (maxAngle - 90) / 100;
   }
 
   function calculateStabilityScore(
@@ -73,7 +100,7 @@ export function createRepDetector() {
     );
     if (repFrames.length === 0) return 0.5;
     
-    // Measure variance in movement path
+    // Measure variance in movement path (using hip Y)
     const yValues = repFrames.map((f) => f.hipMidY);
     const mean = yValues.reduce((a, b) => a + b, 0) / yValues.length;
     const variance = yValues.reduce((a, y) => a + (y - mean) ** 2, 0) / yValues.length;
@@ -82,90 +109,121 @@ export function createRepDetector() {
     return stability;
   }
 
+  function calculateAsymmetryScore(frames: FrameData[]): number {
+    const asymmetries = frames.map((f) =>
+      Math.abs(f.kneeAngleLeft - f.kneeAngleRight)
+    );
+    const avgAsymmetry = asymmetries.reduce((a, b) => a + b, 0) / asymmetries.length;
+    
+    // Convert to 0-1 score (0° asymmetry = 1.0, 45°+ = 0.0)
+    return Math.max(0, 1 - avgAsymmetry / 45);
+  }
+
   function addFrame(state: SmoothedState): RepWindow | null {
+    // Calculate knee angles
+    const kneeAngleLeft = calculateKneeAngle(
+      state.kpts.l_hip,
+      state.kpts.l_knee,
+      state.kpts.l_ankle
+    );
+    const kneeAngleRight = calculateKneeAngle(
+      state.kpts.r_hip,
+      state.kpts.r_knee,
+      state.kpts.r_ankle
+    );
+    const kneeAngleAvg = (kneeAngleLeft + kneeAngleRight) / 2;
+    
     const frameData: FrameData = {
       frameIndex: state.frameIndex,
       hipMidY: state.hipMidY,
+      kneeAngleLeft,
+      kneeAngleRight,
+      kneeAngleAvg,
       conf: state.conf,
     };
     
     history.push(frameData);
     if (history.length > maxHistory) history.shift();
 
-    // Calculate velocity (change in hip Y)
+    const hipY = frameData.hipMidY;
+    // Hip Y velocity: positive = hip moving down (descending), negative = hip moving up (ascending)
     if (history.length >= 2) {
       const prev = history[history.length - 2];
-      const velocity = state.hipMidY - prev.hipMidY;
-      velocities.push(velocity);
-      if (velocities.length > VELOCITY_WINDOW) velocities.shift();
+      const hipVelocity = hipY - prev.hipMidY;
+      hipVelocities.push(hipVelocity);
+      if (hipVelocities.length > HIP_VELOCITY_WINDOW) hipVelocities.shift();
     }
-
-    const avgVelocity = velocities.length > 0
-      ? velocities.reduce((a, b) => a + b, 0) / velocities.length
+    const avgHipVelocity = hipVelocities.length > 0
+      ? hipVelocities.reduce((a, b) => a + b, 0) / hipVelocities.length
       : 0;
-
-    const y = state.hipMidY;
+    const angle = kneeAngleAvg;
+    const asymmetry = Math.abs(kneeAngleLeft - kneeAngleRight);
 
     // Debug logging
     if (state.frameIndex <= 3 || state.frameIndex % DEBUG_LOG_INTERVAL === 0) {
       console.log(
         '[rep] frame', state.frameIndex,
         'phase', phase,
-        'hipY', y.toFixed(3),
-        'velocity', avgVelocity.toFixed(4),
-        'bottomY', bottomY.toFixed(3)
+        'hipY', hipY.toFixed(3),
+        'hipVel', avgHipVelocity.toFixed(4),
+        'kneeAngle', angle.toFixed(1) + '°',
+        'maxAngle', maxKneeAngle.toFixed(1) + '°',
+        'framesSinceBottom', state.frameIndex - bottomFrame,
+        'asymmetry', asymmetry.toFixed(1) + '°'
       );
     }
 
     if (history.length < REP_MIN_FRAMES) return null;
 
-    // State machine
+    // Warn about asymmetry
+    if (asymmetry > MAX_ASYMMETRY_WARN && state.frameIndex % 60 === 0) {
+      console.warn('[rep] ⚠️ High asymmetry:', asymmetry.toFixed(1), '°');
+    }
+
+    // State machine: phases driven by hip level; knee angle used only for squat validation
     switch (phase) {
       case 'waiting': {
-        // Cooldown period
         if (state.frameIndex - lastCountedAtFrame < COOLDOWN_FRAMES) return null;
-        
-        // Detect start of descent (velocity going down = Y increasing)
-        if (avgVelocity > VELOCITY_THRESHOLD) {
+        // Start descent when hip is moving down (positive hip Y velocity)
+        if (avgHipVelocity > HIP_VELOCITY_THRESHOLD) {
           phase = 'descending';
           startFrame = state.frameIndex;
-          startY = y;
-          bottomY = y;
+          startHipY = hipY;
+          maxKneeAngle = angle;
           bottomFrame = state.frameIndex;
+          bottomHipY = hipY;
           committed = false;
-          console.log('[rep] START descent at frame', startFrame, 'Y=', y.toFixed(3));
+          console.log('[rep] ⬇️ START descent at frame', startFrame, 'hipY=', hipY.toFixed(3), 'knee=', angle.toFixed(1) + '°');
         }
         break;
       }
 
       case 'descending': {
-        // Continuously track the deepest position (highest Y value)
-        if (y > bottomY) {
-          bottomY = y;
+        // Bottom = frame where hip Y is highest (lowest body position)
+        if (hipY > bottomHipY) {
+          bottomHipY = hipY;
           bottomFrame = state.frameIndex;
         }
+        // Track min knee angle for squat validation
+        if (angle > maxKneeAngle) maxKneeAngle = angle;
 
-        // Check if committed to rep (dropped enough)
-        const dropY = y - startY;
-        
-        if (!committed && dropY >= MIN_DROP) {
+        // Commit when hip has dropped enough
+        const hipDrop = hipY - startHipY;
+        if (!committed && hipDrop >= MIN_HIP_DROP) {
           committed = true;
-          console.log('[rep] COMMITTED to rep at frame', state.frameIndex, 'drop=', dropY.toFixed(3));
+          console.log('[rep] ✓ COMMITTED at frame', state.frameIndex, 'hipDrop=', hipDrop.toFixed(3));
         }
 
-        // Transition to ascending when:
-        // 1. Velocity reverses (going up = Y decreasing)
-        // 2. We've settled at bottom for a few frames (to avoid noise)
-        const settledAtBottom = state.frameIndex - bottomFrame >= BOTTOM_SETTLE_FRAMES;
-        
-        if (avgVelocity < -VELOCITY_THRESHOLD && settledAtBottom) {
+        const framesSinceBottom = state.frameIndex - bottomFrame;
+        const settledAtBottom = framesSinceBottom >= BOTTOM_SETTLE_FRAMES;
+        // Start ascent when hip is moving up (negative velocity) and we've settled at bottom
+        if (avgHipVelocity < -HIP_VELOCITY_THRESHOLD && settledAtBottom) {
           phase = 'ascending';
-          console.log('[rep] START ascent at frame', state.frameIndex, 'bottomY=', bottomY.toFixed(3));
+          console.log('[rep] ⬆️ START ascent at frame', state.frameIndex, 'bottomHipY=', bottomHipY.toFixed(3), 'maxKneeAngle=', maxKneeAngle.toFixed(1) + '°');
         }
 
-        // Timeout if descending too long
         if (state.frameIndex - startFrame > REP_MAX_FRAMES) {
-          console.warn('[rep] TIMEOUT during descent');
+          console.warn('[rep] ⏱️ TIMEOUT during descent');
           phase = 'waiting';
           committed = false;
         }
@@ -173,55 +231,54 @@ export function createRepDetector() {
       }
 
       case 'ascending': {
-        // Allow bottom to deepen slightly if user goes lower during ascent
-        // But only within a small margin (prevents full re-descent from counting as new bottom)
-        if (y > bottomY + 0.01) {
-          // User went significantly deeper - restart as descending
-          bottomY = y;
+        // If hip goes lower than previous bottom, treat as deeper descent
+        if (hipY > bottomHipY) {
+          bottomHipY = hipY;
           bottomFrame = state.frameIndex;
+          if (angle > maxKneeAngle) maxKneeAngle = angle;
           phase = 'descending';
-          console.log('[rep] DEEPER motion detected, back to descending');
+          console.log('[rep] 🔄 DEEPER motion, back to descending');
           break;
-        } else if (y > bottomY) {
-          // Small fluctuation, just update bottom
-          bottomY = y;
-          bottomFrame = state.frameIndex;
         }
+        if (angle > maxKneeAngle) maxKneeAngle = angle;
 
-        // Check if risen enough to complete rep
-        const riseY = bottomY - y;
-        const totalDrop = bottomY - startY;
-        
-        if (riseY >= RISE_FROM_BOTTOM) {
-          // Validate rep
+        // Rep complete when hip has risen enough from bottom (normalized Y decreased)
+        const hipRise = bottomHipY - hipY;
+
+        if (hipRise >= MIN_HIP_RISE) {
           const repLength = state.frameIndex - startFrame;
           const repDurationSec = repLength / TARGET_FPS;
+          const descendDuration = bottomFrame - startFrame;
+          const ascendDuration = state.frameIndex - bottomFrame;
 
-          // Duration check
+          console.log('[rep] 🎯 Validating rep:', {
+            totalFrames: repLength,
+            hipRise: hipRise.toFixed(3),
+            maxKneeAngle: maxKneeAngle.toFixed(1) + '°',
+            duration: repDurationSec.toFixed(2) + 's'
+          });
+
           if (repDurationSec < MIN_REP_DURATION_SEC) {
-            console.warn('[rep] REJECTED: too fast', repDurationSec.toFixed(2), 's');
+            console.warn('[rep] ❌ REJECTED: too fast', repDurationSec.toFixed(2), 's');
             phase = 'waiting';
             committed = false;
             return null;
           }
           if (repDurationSec > MAX_REP_DURATION_SEC) {
-            console.warn('[rep] REJECTED: too slow', repDurationSec.toFixed(2), 's');
+            console.warn('[rep] ❌ REJECTED: too slow', repDurationSec.toFixed(2), 's');
             phase = 'waiting';
             committed = false;
             return null;
           }
-
-          // Frame count check
           if (repLength < REP_MIN_FRAMES || repLength > REP_MAX_FRAMES) {
-            console.warn('[rep] REJECTED: bad frame count', repLength);
+            console.warn('[rep] ❌ REJECTED: bad frame count', repLength);
             phase = 'waiting';
             committed = false;
             return null;
           }
-
-          // Depth check
-          if (!committed || totalDrop < MIN_DROP) {
-            console.warn('[rep] REJECTED: not deep enough', totalDrop.toFixed(3));
+          // Squat validation: require at least MIN_KNEE_FLEXION (maxKneeAngle >= 25°)
+          if (!committed || maxKneeAngle < MIN_KNEE_FLEXION) {
+            console.warn('[rep] ❌ REJECTED: not a squat (maxKneeAngle)', maxKneeAngle.toFixed(1) + '°', '<', MIN_KNEE_FLEXION + '°');
             phase = 'waiting';
             committed = false;
             return null;
@@ -242,18 +299,21 @@ export function createRepDetector() {
             bottom_frame: bottomFrame,
             end_frame: state.frameIndex,
             rep_confidence: confAvg,
-            depth_score: calculateDepthScore(totalDrop),
+            depth_score: calculateDepthScore(maxKneeAngle),
             stability_score: calculateStabilityScore(history, startFrame, state.frameIndex),
-            max_depth: totalDrop,
+            asymmetry_score: calculateAsymmetryScore(repFrames),
           };
 
           console.warn('[rep] ✅ REP COUNTED', {
-            frames: repLength,
+            totalFrames: repLength,
+            descendFrames: descendDuration,
+            ascendFrames: ascendDuration,
             duration: repDurationSec.toFixed(2) + 's',
-            drop: totalDrop.toFixed(3),
-            rise: riseY.toFixed(3),
+            maxKneeAngle: maxKneeAngle.toFixed(1) + '°',
+            hipRise: hipRise.toFixed(3),
             depthScore: result.depth_score.toFixed(2),
             stabilityScore: result.stability_score.toFixed(2),
+            asymmetryScore: result.asymmetry_score.toFixed(2),
           });
 
           return result;
@@ -261,7 +321,7 @@ export function createRepDetector() {
 
         // Timeout during ascent
         if (state.frameIndex - bottomFrame > REP_MAX_FRAMES) {
-          console.warn('[rep] TIMEOUT during ascent');
+          console.warn('[rep] ⏱️ TIMEOUT during ascent');
           phase = 'waiting';
           committed = false;
         }
@@ -274,12 +334,13 @@ export function createRepDetector() {
 
   function reset(): void {
     history.length = 0;
-    velocities.length = 0;
+    hipVelocities.length = 0;
     phase = 'waiting';
     startFrame = 0;
-    startY = 0;
+    startHipY = 0;
     bottomFrame = 0;
-    bottomY = 0;
+    bottomHipY = 0;
+    maxKneeAngle = 0;
     committed = false;
     lastCountedAtFrame = 0;
   }
