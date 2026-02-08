@@ -15,6 +15,8 @@ export interface PushupRepWindow {
   stability_score: number;
   asymmetry_score: number;
   min_elbow_angle: number;
+  /** Rep duration in seconds (for coach feedback, not used for rejection). */
+  rep_duration_sec: number;
 }
 
 const MIN_SHOULDER_DROP = 0.02;
@@ -22,8 +24,6 @@ const MIN_SHOULDER_RISE = 0.02;
 const SHOULDER_VELOCITY_WINDOW = 5;
 const SHOULDER_VELOCITY_THRESHOLD = 0.0012;
 const MIN_ELBOW_FLEXION = 25;
-const MIN_REP_DURATION_SEC = 0.8;
-const MAX_REP_DURATION_SEC = 8.0;
 const COOLDOWN_FRAMES = 12;
 const BOTTOM_SETTLE_FRAMES = 5;
 
@@ -180,16 +180,6 @@ export function createPushupRepDetector() {
           const repLength = state.frameIndex - startFrame;
           const repDurationSec = repLength / TARGET_FPS;
 
-          if (repDurationSec < MIN_REP_DURATION_SEC) {
-            phase = 'waiting';
-            committed = false;
-            return null;
-          }
-          if (repDurationSec > MAX_REP_DURATION_SEC) {
-            phase = 'waiting';
-            committed = false;
-            return null;
-          }
           if (
             repLength < REP_MIN_FRAMES ||
             repLength > REP_MAX_FRAMES
@@ -240,6 +230,7 @@ export function createPushupRepDetector() {
             stability_score: stabilityScore,
             asymmetry_score: asymmetryScore,
             min_elbow_angle: minElbowAngle,
+            rep_duration_sec: repDurationSec,
           };
         }
 

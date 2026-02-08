@@ -92,6 +92,7 @@ export function createPushupMotionEngine() {
       stability_score: repWindow.stability_score,
       asymmetry_score: repWindow.asymmetry_score,
       min_knee_angle: repWindow.min_elbow_angle,
+      rep_duration_sec: repWindow.rep_duration_sec,
     };
     repIndex += 1;
 

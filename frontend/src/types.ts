@@ -72,6 +72,8 @@ export interface RepSummary {
   stability_score?: number;
   asymmetry_score?: number;
   min_knee_angle?: number;
+  /** Rep duration in seconds (for coach feedback on speed/tempo). */
+  rep_duration_sec?: number;
 }
 
 export interface AssistantOutput {

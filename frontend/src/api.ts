@@ -31,6 +31,7 @@ function toRepPayload(rep: RepSummary, sessionId: string) {
   if (rep.stability_score !== undefined) confidence.stability_score = rep.stability_score;
   if (rep.asymmetry_score !== undefined) confidence.asymmetry_score = rep.asymmetry_score;
   if (rep.min_knee_angle !== undefined) confidence.min_knee_angle = rep.min_knee_angle;
+  if (rep.rep_duration_sec !== undefined) confidence.rep_duration_sec = rep.rep_duration_sec;
   return {
     session_id: sessionId,
     rep_index: rep.rep_index,

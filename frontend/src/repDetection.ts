@@ -16,22 +16,20 @@ export interface RepWindow {
   depth_score: number;
   stability_score: number;
   asymmetry_score: number;
+  /** Rep duration in seconds (for coach feedback, not used for rejection). */
+  rep_duration_sec: number;
 }
 
 /** Hip Y: minimum drop from start to bottom (normalized) to commit to rep */
-const MIN_HIP_DROP = 0.03;
+const MIN_HIP_DROP = 0.1;
 /** Hip Y: minimum rise from bottom to consider rep complete (normalized) */
-const MIN_HIP_RISE = 0.03;
+const MIN_HIP_RISE = 0.1;
 /** Hip velocity window (frames) for smoothing */
 const HIP_VELOCITY_WINDOW = 5;
 /** Hip velocity threshold: Y per frame to detect descent/ascent */
 const HIP_VELOCITY_THRESHOLD = 0.0015;
 /** Minimum knee flexion (degrees bent from straight) to count as a valid squat: maxKneeAngle >= this */
 const MIN_KNEE_FLEXION = 70;
-/** Minimum time for a rep (seconds) */
-const MIN_REP_DURATION_SEC = 0.55;
-/** Maximum time for a rep (seconds) */
-const MAX_REP_DURATION_SEC = 5.0;
 /** Cooldown frames after counting */
 const COOLDOWN_FRAMES = 12;
 /** Frames to wait at bottom before allowing ascent transition */
@@ -280,18 +278,6 @@ export function createRepDetector() {
             duration: repDurationSec.toFixed(2) + 's'
           });
 
-          if (repDurationSec < MIN_REP_DURATION_SEC) {
-            console.warn('[rep] ❌ REJECTED: too fast', repDurationSec.toFixed(2), 's');
-            phase = 'waiting';
-            committed = false;
-            return null;
-          }
-          if (repDurationSec > MAX_REP_DURATION_SEC) {
-            console.warn('[rep] ❌ REJECTED: too slow', repDurationSec.toFixed(2), 's');
-            phase = 'waiting';
-            committed = false;
-            return null;
-          }
           if (repLength < REP_MIN_FRAMES || repLength > REP_MAX_FRAMES) {
             console.warn('[rep] ❌ REJECTED: bad frame count', repLength);
             phase = 'waiting';
@@ -324,6 +310,7 @@ export function createRepDetector() {
             depth_score: calculateDepthScore(maxKneeAngle),
             stability_score: calculateStabilityScore(history, startFrame, state.frameIndex),
             asymmetry_score: calculateAsymmetryScore(repFrames),
+            rep_duration_sec: repDurationSec,
           };
 
           console.warn('[rep] ✅ REP COUNTED', {
