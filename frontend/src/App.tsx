@@ -38,6 +38,13 @@ const SEVERITY_RANK: Record<Severity, number> = {
   moderate: 2,
   low: 1,
 };
+const VOICE_OPTIONS = [
+  { label: "Rachel", id: "EXAVITQu4vr4xnSDxMaL" },
+  { label: "Bella", id: "hpp4J3VqNfWAUOO0d1Us" },
+  { label: "Lily", id: "pFZP5JQG7iQjIQuC4Bku" },
+  { label: "Callum", id: "N2lVS1w4EtoT3dr4eOWO" },
+  { label: "Adam", id: "pNInz6obpgDQGcFmaJgB" },
+];
 
 /** One-line summary of the single most critical form issue for the backend. */
 function getMostCriticalIssue(rep: RepSummary): string {
@@ -94,6 +101,12 @@ export default function App() {
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [assistantError, setAssistantError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [checkInVoiceId, setCheckInVoiceId] = useState<string>(
+    VOICE_OPTIONS[0].id,
+  );
+  const [coachVoiceId, setCoachVoiceId] = useState<string>(
+    VOICE_OPTIONS[0].id,
+  );
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const landmarkerRef = useRef<Awaited<
@@ -349,11 +362,11 @@ export default function App() {
       .filter((text) => text && text.trim())
       .join(". ");
     if (textToSpeak) {
-      generateAndPlayAudio(textToSpeak).catch((err) =>
+      generateAndPlayAudio(textToSpeak, coachVoiceId).catch((err) =>
         console.error("Failed to generate audio feedback:", err),
       );
     }
-  }, [assistantOutput]);
+  }, [assistantOutput, coachVoiceId]);
 
   // Play check-in feedback when every-5-reps response arrives
   useEffect(() => {
@@ -362,11 +375,11 @@ export default function App() {
       .filter((text) => text && text.trim())
       .join(". ");
     if (textToSpeak) {
-      generateAndPlayAudio(textToSpeak).catch((err) =>
+      generateAndPlayAudio(textToSpeak, checkInVoiceId).catch((err) =>
         console.error("Failed to generate audio check-in:", err),
       );
     }
-  }, [checkInOutput]);
+  }, [checkInOutput, checkInVoiceId]);
 
   const displayChecks =
     lastRepChecks ?? (reps.length > 0 ? reps[reps.length - 1].checks : null);
@@ -584,6 +597,75 @@ export default function App() {
             {phase === "RepComplete" && `Rep complete · Reps: ${reps.length}`}
             {phase === "SetSummary" && "Set summary with coach feedback."}
           </p>
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 12,
+            }}
+          >
+            <h3 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 600 }}>
+              Voice settings
+            </h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, color: "var(--muted)" }}>
+                  Check-in voice
+                </label>
+                <select
+                  value={checkInVoiceId}
+                  onChange={(e) => setCheckInVoiceId(e.target.value)}
+                  style={
+                    {
+                      padding: "8px 10px",
+                      background: "var(--surface)",
+                      color: "var(--text)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    } as React.CSSProperties
+                  }
+                >
+                  {VOICE_OPTIONS.map((voice) => (
+                    <option key={voice.id} value={voice.id}>
+                      {voice.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 12, color: "var(--muted)" }}>
+                  Coach voice
+                </label>
+                <select
+                  value={coachVoiceId}
+                  onChange={(e) => setCoachVoiceId(e.target.value)}
+                  style={
+                    {
+                      padding: "8px 10px",
+                      background: "var(--surface)",
+                      color: "var(--text)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    } as React.CSSProperties
+                  }
+                >
+                  {VOICE_OPTIONS.map((voice) => (
+                    <option key={voice.id} value={voice.id}>
+                      {voice.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
           <StatusCards checks={displayChecks} liveChecks={showLiveChecks} />
           {reps.length > 0 && phase !== "SetSummary" && (
             <button
