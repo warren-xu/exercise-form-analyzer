@@ -158,6 +158,22 @@ export default function App() {
     setPhase("Live");
   }, []);
 
+  const startNewSession = useCallback(() => {
+    stopCamera();
+    sessionIdRef.current = generateSessionId();
+    lastCheckInRepsSentRef.current = 0;
+    engineRef.current?.reset();
+    setPhase("Ready");
+    setReps([]);
+    setLastRepChecks(null);
+    setLiveChecks(null);
+    setAssistantOutput(null);
+    setCheckInOutput(null);
+    setCheckInLoading(false);
+    setCheckInError(null);
+    setAssistantError(null);
+  }, [stopCamera]);
+
   useEffect(() => {
     if (
       phase !== "Live" ||
@@ -448,67 +464,100 @@ export default function App() {
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div
-            style={{
-              position: "relative",
-              background: "#000",
-              borderRadius: 12,
-              overflow: "hidden",
-            }}
-          >
-            <WebcamCapture
-              onStream={onStream}
-              onVideoRef={onVideoRef}
-              className={undefined}
-            />
-            {currentKeypoints && phase === "Live" && (
-              <OverlayRenderer
-                keypoints={currentKeypoints}
-                width={videoSize.width}
-                height={videoSize.height}
-              />
-            )}
-            {phase === "Calibrate" && cameraReady && (
-              <div
+          {phase === "SetSummary" ? (
+            <div
+              style={{
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                minHeight: 360,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 24,
+              }}
+            >
+              <p
                 style={{
-                  position: "absolute",
-                  bottom: 16,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  display: "flex",
-                  gap: 8,
+                  margin: "0 0 20px",
+                  fontSize: 16,
+                  color: "var(--muted)",
                 }}
               >
-                <button
-                  type="button"
-                  onClick={goLive}
-                  style={primaryButtonStyle}
-                >
-                  Start analysis
-                </button>
-              </div>
-            )}
-            {phase === "Ready" && cameraReady && (
+                Session complete
+              </p>
+              <button
+                type="button"
+                onClick={startNewSession}
+                style={primaryButtonStyle}
+              >
+                New session
+              </button>
+            </div>
+          ) : (
+            <>
               <div
                 style={{
-                  position: "absolute",
-                  bottom: 16,
-                  left: "50%",
-                  transform: "translateX(-50%)",
+                  position: "relative",
+                  background: "#000",
+                  borderRadius: 12,
+                  overflow: "hidden",
                 }}
               >
-                <button
-                  type="button"
-                  onClick={startInference}
-                  style={primaryButtonStyle}
-                >
-                  Calibrate & start
-                </button>
+                <WebcamCapture
+                  onStream={onStream}
+                  onVideoRef={onVideoRef}
+                  className={undefined}
+                />
+                {currentKeypoints && phase === "Live" && (
+                  <OverlayRenderer
+                    keypoints={currentKeypoints}
+                    width={videoSize.width}
+                    height={videoSize.height}
+                  />
+                )}
+                {phase === "Calibrate" && cameraReady && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 16,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      display: "flex",
+                      gap: 8,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={goLive}
+                      style={primaryButtonStyle}
+                    >
+                      Start analysis
+                    </button>
+                  </div>
+                )}
+                {phase === "Ready" && cameraReady && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 16,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={startInference}
+                      style={primaryButtonStyle}
+                    >
+                      Calibrate & start
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {phase === "Live" &&
+              {phase === "Live" &&
             (checkInLoading || checkInOutput || checkInError) && (
               <div
                 style={{
@@ -561,6 +610,8 @@ export default function App() {
                 )}
               </div>
             )}
+            </>
+          )}
         </div>
 
         <div>
