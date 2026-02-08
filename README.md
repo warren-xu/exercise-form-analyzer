@@ -1,10 +1,10 @@
-# Exercise Form Analyzer — Live Webcam Squat Feedback
+# Exercise Form Analyzer — Live Webcam Exercise Form Feedback
 
-Proof-of-concept web app for **live squat form feedback** using the browser webcam. Pose estimation and motion analysis run **in the browser**; only a small structured summary is sent to the backend, which uses a **Backboard.io** (or compatible) AI assistant to return coaching text.
+Web app for **live exercise form feedback** using the browser webcam. Pose estimation and motion analysis run **in the browser**; only a small structured summary is sent to the backend, which use a **Backboard.io** (or compatible) AI assistant to return coaching text.
 
 ## Features
 
-- **In-browser:** Pose estimation (MediaPipe Pose Landmarker), smoothing, rep detection, and form checks (depth, knee tracking, torso angle, heel lift, asymmetry).
+- **In-browser:** Pose estimation (MediaPipe Pose Landmarker), smoothing, rep detection, and configurable form checks (joint alignment, torso angle, range-of-motion, symmetry, and more).
 - **Privacy-first:** Raw video never leaves the device.
 - **Backend:** Stateless API; optional Backboard integration for set-level coaching.
 - **UI:** Dark mode, live skeleton overlay, **live** and rep-based status cards (OK / Watch / Flag), coach panel.
@@ -39,14 +39,14 @@ Runs at `http://localhost:5173` and proxies `/api` to the backend.
 
 1. Allow camera access and click **Start camera**.
 2. Click **Calibrate & start**, then **Start analysis**.
-3. Perform squats (full body in frame, 3/4 or side view).
+3. Perform one or more exercises with full body visible in frame.
 4. After one or more reps, click **Get coach feedback** for the set-level AI summary.
 
 ## Camera setup (recommended)
 
-- **Angle:** 3/4 front or side; side for depth/torso, 3/4 for knee tracking and symmetry.
-- **Framing:** Full body including feet, knees, hips, shoulders.
-- **Lighting:** Even; avoid strong backlight.
+- **Angle:** 3/4 front or side depending on the exercise and which joints you want to emphasize.
+- **Framing:** Full body (include feet and head) so key landmarks are visible.
+- **Lighting:** Even lighting; avoid strong backlight or heavy shadows.
 
 ## Configuration
 
@@ -55,7 +55,7 @@ Runs at `http://localhost:5173` and proxies `/api` to the backend.
 
 ## How reps are detected
 
-See **docs/PIPELINE.md** for the full flow (pose → smoothing → rep detection → form checks) and why reps might not increment.
+See [docs/PIPELINE.md](docs/PIPELINE.md) for the full flow (pose → smoothing → rep detection → form checks) and tuning notes.
 
 ## Unclear / optional items
 
@@ -63,5 +63,5 @@ See **SPEC_NOTES.md** for decisions and extension points (Backboard API shape, r
 
 ## Tech stack
 
-- **Frontend:** React, TypeScript, Vite, `@mediapipe/tasks-vision` (Pose Landmarker). **Live** form checks use a rolling window (~0.75 s).
-- **Backend:** Python, FastAPI, httpx (Backboard client). No database.
+- **Frontend:** React, TypeScript, Vite, `@mediapipe/tasks-vision` (Pose Landmarker). Live form checks use a short rolling window for smoothing and stability.
+- **Backend:** Python, FastAPI, httpx (Backboard client). The backend is stateless by default and does not require a database for core functionality.
