@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth0 } from "@auth0/auth0-react";
 import { WebcamCapture } from "./WebcamCapture";
 import { OverlayRenderer } from "./OverlayRenderer";
 import { StatusCards } from "./StatusCards";
@@ -10,7 +10,13 @@ import { createMotionAnalysisEngine } from "./MotionAnalysisEngine";
 import { isBodyReadyForSquat } from "./bodyReadyForSquat";
 import { getSetCoach } from "./api";
 import { generateAndPlayAudio } from "./elevenlabs";
-import type { AppPhase, RepSummary, RepCheckResult, AssistantOutput, Severity } from "./types";
+import type {
+  AppPhase,
+  RepSummary,
+  RepCheckResult,
+  AssistantOutput,
+  Severity,
+} from "./types";
 import type { SmoothedState } from "./smoothing";
 
 const CHECK_ORDER: (keyof RepSummary["checks"])[] = [
@@ -80,7 +86,9 @@ export default function App() {
   const [assistantOutput, setAssistantOutput] =
     useState<AssistantOutput | null>(null);
   /** Every-5-reps check-in feedback (shown in panel under live feed) */
-  const [checkInOutput, setCheckInOutput] = useState<AssistantOutput | null>(null);
+  const [checkInOutput, setCheckInOutput] = useState<AssistantOutput | null>(
+    null,
+  );
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [checkInError, setCheckInError] = useState<string | null>(null);
   const [assistantLoading, setAssistantLoading] = useState(false);
@@ -232,37 +240,53 @@ export default function App() {
       const token = await getAccessTokenSilently().catch(() => undefined);
       const idClaims = await getIdTokenClaims().catch(() => undefined);
       const userId = idClaims?.sub;
-      console.log('🔍 Access token retrieved:', token ? `${token.substring(0, 20)}...` : 'undefined');
-      const output = await getSetCoach(sessionIdRef.current, reps, undefined, token, userId);
-      
+      console.log(
+        "🔍 Access token retrieved:",
+        token ? `${token.substring(0, 20)}...` : "undefined",
+      );
+      const output = await getSetCoach(
+        sessionIdRef.current,
+        reps,
+        undefined,
+        "set_summary",
+        token,
+        userId,
+      );
+
       // Log MongoDB save status
-      console.log('\n' + '='.repeat(80));
-      console.log('💾 MONGODB SAVE STATUS');
-      console.log('='.repeat(80));
-      console.log('Session saved to database:', output.saved_to_db);
+      console.log("\n" + "=".repeat(80));
+      console.log("💾 MONGODB SAVE STATUS");
+      console.log("=".repeat(80));
+      console.log("Session saved to database:", output.saved_to_db);
       if (output.saved_to_db && output.db_session_id) {
-        console.log('✅ Database session ID:', output.db_session_id);
-        console.log('✅ Session ID:', sessionIdRef.current);
-        console.log('✅ Rep count:', reps.length);
+        console.log("✅ Database session ID:", output.db_session_id);
+        console.log("✅ Session ID:", sessionIdRef.current);
+        console.log("✅ Rep count:", reps.length);
       } else {
-        console.log('❌ Session was NOT saved to database');
+        console.log("❌ Session was NOT saved to database");
       }
-      
+
       // Show detailed debug info
       if (output.debug_info) {
-        console.log('\n🔍 DEBUG INFO:');
-        console.log('  Authorization received:', output.debug_info.authorization_received);
-        console.log('  MongoDB save attempted:', output.debug_info.mongodb_attempted);
+        console.log("\n🔍 DEBUG INFO:");
+        console.log(
+          "  Authorization received:",
+          output.debug_info.authorization_received,
+        );
+        console.log(
+          "  MongoDB save attempted:",
+          output.debug_info.mongodb_attempted,
+        );
         if (output.debug_info.error) {
-          console.log('  Error:', output.debug_info.error);
+          console.log("  Error:", output.debug_info.error);
         }
-        console.log('\n📝 Backend logs:');
+        console.log("\n📝 Backend logs:");
         output.debug_info.logs?.forEach((log: string, i: number) => {
           console.log(`  ${i + 1}. ${log}`);
         });
       }
-      console.log('='.repeat(80) + '\n');
-      
+      console.log("=".repeat(80) + "\n");
+
       setAssistantOutput(output);
       setPhase("SetSummary");
       stopCamera();
@@ -286,7 +310,7 @@ export default function App() {
       sessionIdRef.current,
       reps,
       { worst_issues: [mostCritical], consistency_note: "Rep accepted." },
-      "check_in"
+      "check_in",
     )
       .then((output) => {
         setCheckInOutput(output);
@@ -326,7 +350,7 @@ export default function App() {
       .join(". ");
     if (textToSpeak) {
       generateAndPlayAudio(textToSpeak).catch((err) =>
-        console.error("Failed to generate audio feedback:", err)
+        console.error("Failed to generate audio feedback:", err),
       );
     }
   }, [assistantOutput]);
@@ -339,7 +363,7 @@ export default function App() {
       .join(". ");
     if (textToSpeak) {
       generateAndPlayAudio(textToSpeak).catch((err) =>
-        console.error("Failed to generate audio check-in:", err)
+        console.error("Failed to generate audio check-in:", err),
       );
     }
   }, [checkInOutput]);
@@ -357,7 +381,14 @@ export default function App() {
         padding: 24,
       }}
     >
-      <header style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+      <header
+        style={{
+          marginBottom: 24,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "start",
+        }}
+      >
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>
             Squat Form Analyzer
@@ -366,14 +397,23 @@ export default function App() {
             Camera: 3/4 front or side · Full body in frame · Even lighting
           </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 8,
+          }}
+        >
           {user && (
             <div style={{ fontSize: 14, color: "var(--muted)" }}>
               {user.name}
             </div>
           )}
           <button
-            onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+            onClick={() =>
+              logout({ logoutParams: { returnTo: window.location.origin } })
+            }
             style={{
               padding: "8px 16px",
               fontSize: 14,
@@ -439,7 +479,11 @@ export default function App() {
                   gap: 8,
                 }}
               >
-                <button type="button" onClick={goLive} style={primaryButtonStyle}>
+                <button
+                  type="button"
+                  onClick={goLive}
+                  style={primaryButtonStyle}
+                >
                   Start analysis
                 </button>
               </div>
@@ -464,54 +508,59 @@ export default function App() {
             )}
           </div>
 
-          {phase === "Live" && (checkInLoading || checkInOutput || checkInError) && (
-            <div
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-                padding: 16,
-              }}
-            >
-              <h3 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 600 }}>
-                Check-in
-              </h3>
-              {checkInLoading && (
-                <p style={{ margin: 0, color: "var(--muted)", fontSize: 14 }}>
-                  Generating feedback…
-                </p>
-              )}
-              {!checkInLoading && checkInError && (
-                <p style={{ margin: 0, color: "var(--flag)", fontSize: 14 }}>
-                  {checkInError}
-                </p>
-              )}
-              {!checkInLoading && checkInOutput && (
-                <>
-                  <p style={{ margin: "0 0 10px", lineHeight: 1.5 }}>
-                    {checkInOutput.summary}
+          {phase === "Live" &&
+            (checkInLoading || checkInOutput || checkInError) && (
+              <div
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 12,
+                  padding: 16,
+                }}
+              >
+                <h3
+                  style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 600 }}
+                >
+                  Check-in
+                </h3>
+                {checkInLoading && (
+                  <p style={{ margin: 0, color: "var(--muted)", fontSize: 14 }}>
+                    Generating feedback…
                   </p>
-                  {checkInOutput.cues.length > 0 && (
-                    <ul
-                      style={{
-                        margin: "0 0 10px",
-                        paddingLeft: 20,
-                        lineHeight: 1.5,
-                        fontSize: 14,
-                      }}
+                )}
+                {!checkInLoading && checkInError && (
+                  <p style={{ margin: 0, color: "var(--flag)", fontSize: 14 }}>
+                    {checkInError}
+                  </p>
+                )}
+                {!checkInLoading && checkInOutput && (
+                  <>
+                    <p style={{ margin: "0 0 10px", lineHeight: 1.5 }}>
+                      {checkInOutput.summary}
+                    </p>
+                    {checkInOutput.cues.length > 0 && (
+                      <ul
+                        style={{
+                          margin: "0 0 10px",
+                          paddingLeft: 20,
+                          lineHeight: 1.5,
+                          fontSize: 14,
+                        }}
+                      >
+                        {checkInOutput.cues.map((cue, i) => (
+                          <li key={i}>{cue}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <p
+                      style={{ margin: 0, fontSize: 13, color: "var(--watch)" }}
                     >
-                      {checkInOutput.cues.map((cue, i) => (
-                        <li key={i}>{cue}</li>
-                      ))}
-                    </ul>
-                  )}
-                  <p style={{ margin: 0, fontSize: 13, color: "var(--watch)" }}>
-                    {checkInOutput.safety_note}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
+                      {checkInOutput.safety_note}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
         </div>
 
         <div>
