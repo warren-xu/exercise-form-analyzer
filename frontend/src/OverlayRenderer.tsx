@@ -43,8 +43,8 @@ export function OverlayRenderer({
     const toX = (x: number) => x * width;
     const toY = (y: number) => y * height;
 
-    ctx.strokeStyle = "rgba(167, 139, 250, 0.9)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(167, 139, 250, 0.95)";
+    ctx.lineWidth = 10;
     for (const [a, b] of SEGMENTS) {
       const [x1, y1] = keypoints[a];
       const [x2, y2] = keypoints[b];
@@ -68,7 +68,7 @@ export function OverlayRenderer({
     for (const j of joints) {
       const [x, y] = keypoints[j];
       ctx.beginPath();
-      ctx.arc(toX(x), toY(y), 4, 0, Math.PI * 2);
+      ctx.arc(toX(x), toY(y), 8, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -77,14 +77,14 @@ export function OverlayRenderer({
     ctx.arc(
       toX(keypoints.l_knee[0]),
       toY(keypoints.l_knee[1]),
-      6,
+      7,
       0,
       Math.PI * 2,
     );
     ctx.arc(
       toX(keypoints.r_knee[0]),
       toY(keypoints.r_knee[1]),
-      6,
+      7,
       0,
       Math.PI * 2,
     );

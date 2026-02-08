@@ -110,6 +110,8 @@ export default function App() {
   const sessionIdRef = useRef<string>(generateSessionId());
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
+  /** Monotonically increasing timestamp for MediaPipe VIDEO mode (avoids freeze when video.currentTime stalls). */
+  const lastMediaPipeTimestampRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
   const lastCheckInRepsSentRef = useRef<number>(0);
 
@@ -196,6 +198,7 @@ export default function App() {
     const engine = engineRef.current;
     const intervalMs = 1000 / TARGET_FPS;
     let tickCount = 0;
+    lastMediaPipeTimestampRef.current = 0;
     console.log(
       "[rep] Live inference loop started. Open Console (F12) and look for [rep] messages.",
     );
@@ -213,7 +216,8 @@ export default function App() {
       }
       let result: ReturnType<typeof detectPose> = null;
       try {
-        const timestampMs = video.currentTime * 1000;
+        lastMediaPipeTimestampRef.current += intervalMs;
+        const timestampMs = lastMediaPipeTimestampRef.current;
         result = detectPose(landmarker, video, timestampMs);
       } catch (err) {
         if (tickCount <= 3 || tickCount % 60 === 0)
@@ -416,7 +420,7 @@ export default function App() {
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>RepWrite</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>RepRight</h1>
         </div>
         <div
           style={{

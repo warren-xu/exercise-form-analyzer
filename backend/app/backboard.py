@@ -140,20 +140,15 @@ async def get_set_coach_response(
     model_name = os.environ.get("BACKBOARD_MODEL", "gpt-4o-mini")
     system_prompt = _get_system_prompt(coach_mode, exercise_type)
 
-    print(f"[DEBUG] Calling Backboard with provider={llm_provider}, model={model_name}")
-
     try:
         client = BackboardClient(api_key=api_key)
-        print("[DEBUG] BackboardClient created successfully")
 
         assistant = await client.create_assistant(
-            name="Squat Form Coach",
+            name="RepRight Form Coach",
             system_prompt=system_prompt,
         )
-        print(f"[DEBUG] Assistant created: {assistant.assistant_id}")
 
         thread = await client.create_thread(assistant.assistant_id)
-        print(f"[DEBUG] Thread created: {thread.thread_id}")
 
         response = await client.add_message(
             thread_id=thread.thread_id,
