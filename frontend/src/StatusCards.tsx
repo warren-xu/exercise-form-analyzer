@@ -1,11 +1,11 @@
 /**
- * Five check status cards: Depth, Knee Tracking, Torso Angle, Heel Lift, Asymmetry.
+ * Check status cards: Knee Tracking, Torso Angle, Heel Lift, Asymmetry.
+ * Depth is not shown (too inconsistent to flag in live UI).
  */
 
 import type { RepCheckResult, CheckStatus } from './types';
 
 const CARD_LABELS: Record<string, string> = {
-  depth: 'Depth',
   knee_tracking: 'Knee Tracking',
   torso_angle: 'Torso Angle',
   heel_lift: 'Heel Lift',
