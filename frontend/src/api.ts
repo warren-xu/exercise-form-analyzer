@@ -26,10 +26,15 @@ export async function healthCheck(): Promise<{ status: string }> {
 
 /** Convert frontend RepSummary to backend rep payload (no frame indices). */
 function toRepPayload(rep: RepSummary, sessionId: string) {
+  const confidence: Record<string, unknown> = { ...rep.confidence };
+  if (rep.depth_score !== undefined) confidence.depth_score = rep.depth_score;
+  if (rep.stability_score !== undefined) confidence.stability_score = rep.stability_score;
+  if (rep.asymmetry_score !== undefined) confidence.asymmetry_score = rep.asymmetry_score;
+  if (rep.min_knee_angle !== undefined) confidence.min_knee_angle = rep.min_knee_angle;
   return {
     session_id: sessionId,
     rep_index: rep.rep_index,
-    confidence: rep.confidence,
+    confidence,
     checks: {
       depth: { severity: rep.checks.depth.severity, evidence: rep.checks.depth.evidence },
       knee_tracking: { severity: rep.checks.knee_tracking.severity, evidence: rep.checks.knee_tracking.evidence },

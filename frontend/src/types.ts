@@ -16,6 +16,18 @@ export interface Keypoints {
   r_shoulder: [number, number];
 }
 
+/** 3D keypoints (MediaPipe world landmarks: x, y, z in meters). */
+export interface Keypoints3D {
+  l_hip: [number, number, number];
+  r_hip: [number, number, number];
+  l_knee: [number, number, number];
+  r_knee: [number, number, number];
+  l_ankle: [number, number, number];
+  r_ankle: [number, number, number];
+  l_shoulder: [number, number, number];
+  r_shoulder: [number, number, number];
+}
+
 export interface FramePayload {
   t: number;
   kpts: Keypoints;
@@ -47,6 +59,11 @@ export interface RepSummary {
     heel_lift: RepCheckResult;
     asymmetry: RepCheckResult;
   };
+  /** From rep detector: depth (0–1), stability (0–1), asymmetry (0–1), min knee angle (degrees). */
+  depth_score?: number;
+  stability_score?: number;
+  asymmetry_score?: number;
+  min_knee_angle?: number;
 }
 
 export interface AssistantOutput {

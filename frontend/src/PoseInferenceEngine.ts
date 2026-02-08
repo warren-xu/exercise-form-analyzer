@@ -9,7 +9,7 @@
  */
 
 import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
-import type { Keypoints } from './types';
+import type { Keypoints, Keypoints3D } from './types';
 import { POSE_LANDMARKS } from './constants';
 
 let landmarker: PoseLandmarker | null = null;
@@ -43,6 +43,15 @@ function getLandmark(
   return [l.x, l.y];
 }
 
+function getWorldLandmark(
+  worldLandmarks: Array<{ x: number; y: number; z: number }>,
+  index: number
+): [number, number, number] {
+  const l = worldLandmarks[index];
+  if (!l) return [0, 0, 0];
+  return [l.x, l.y, l.z];
+}
+
 function avgVisibility(
   landmarks: Array<{ visibility?: number }>,
   indices: number[]
@@ -59,12 +68,13 @@ function avgVisibility(
 
 /**
  * Run detection on a video frame. Call with video.currentTime for VIDEO mode.
+ * Returns 2D keypoints (for display) and 3D world landmarks (for angle computation).
  */
 export function detectPose(
   landmarker: PoseLandmarker,
   video: HTMLVideoElement,
   timestampMs: number
-): { kpts: Keypoints; conf: number } | null {
+): { kpts: Keypoints; kpts3d: Keypoints3D | null; conf: number } | null {
   const result = landmarker.detectForVideo(video, timestampMs);
   if (!result.landmarks?.length) return null;
   const lm = result.landmarks[0];
@@ -81,6 +91,21 @@ export function detectPose(
     r_shoulder: getLandmark(lm, POSE_LANDMARKS.RIGHT_SHOULDER),
   };
 
+  let kpts3d: Keypoints3D | null = null;
+  const wlm = result.worldLandmarks?.[0];
+  if (wlm?.length) {
+    kpts3d = {
+      l_hip: getWorldLandmark(wlm, POSE_LANDMARKS.LEFT_HIP),
+      r_hip: getWorldLandmark(wlm, POSE_LANDMARKS.RIGHT_HIP),
+      l_knee: getWorldLandmark(wlm, POSE_LANDMARKS.LEFT_KNEE),
+      r_knee: getWorldLandmark(wlm, POSE_LANDMARKS.RIGHT_KNEE),
+      l_ankle: getWorldLandmark(wlm, POSE_LANDMARKS.LEFT_ANKLE),
+      r_ankle: getWorldLandmark(wlm, POSE_LANDMARKS.RIGHT_ANKLE),
+      l_shoulder: getWorldLandmark(wlm, POSE_LANDMARKS.LEFT_SHOULDER),
+      r_shoulder: getWorldLandmark(wlm, POSE_LANDMARKS.RIGHT_SHOULDER),
+    };
+  }
+
   const indices = [
     POSE_LANDMARKS.LEFT_HIP,
     POSE_LANDMARKS.RIGHT_HIP,
@@ -92,5 +117,5 @@ export function detectPose(
     POSE_LANDMARKS.RIGHT_SHOULDER,
   ];
   const conf = avgVisibility(lm, indices);
-  return { kpts, conf };
+  return { kpts, kpts3d, conf };
 }

@@ -50,3 +50,7 @@ class RepCueResponse(BaseModel):
 class ErrorDetail(BaseModel):
     error: str
     detail: Optional[str] = None
+
+
+class TTSRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=5000)
