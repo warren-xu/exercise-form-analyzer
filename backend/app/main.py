@@ -8,14 +8,17 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from .backboard import get_set_coach_response
+from .tts import text_to_speech
 from .schemas import (
     AssistantOutput,
     RepCueResponse,
     SetSummaryRequest,
     RepSummaryRequest,
     ErrorDetail,
+    TTSRequest,
 )
 
 
@@ -75,6 +78,33 @@ async def coach_set(body: SetSummaryRequest):
             set_level_summary=body.set_level_summary.model_dump() if body.set_level_summary is not None else None,
         )
         return output
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=str(e),
+        )
+
+
+@app.post(
+    "/api/tts",
+    responses={400: {"model": ErrorDetail}, 502: {"model": ErrorDetail}},
+)
+async def generate_audio(body: TTSRequest):
+    """Generate audio from text using ElevenLabs."""
+    try:
+        audio_bytes = await text_to_speech(body.text)
+        if audio_bytes is None:
+            raise HTTPException(
+                status_code=502,
+                detail="ElevenLabs API key not configured or TTS failed",
+            )
+        return StreamingResponse(
+            iter([audio_bytes]),
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": "attachment; filename=coaching-feedback.mp3"},
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=502,

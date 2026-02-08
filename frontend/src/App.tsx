@@ -7,6 +7,7 @@ import { initPoseLandmarker, detectPose } from "./PoseInferenceEngine";
 import { createMotionAnalysisEngine } from "./MotionAnalysisEngine";
 import { isBodyReadyForSquat } from "./bodyReadyForSquat";
 import { getSetCoach } from "./api";
+import { generateAndPlayAudio } from "./elevenlabs";
 import type { AppPhase } from "./types";
 import type { RepSummary, RepCheckResult } from "./types";
 import type { AssistantOutput } from "./types";
@@ -209,6 +210,24 @@ export default function App() {
     };
     setReps((prev) => prev.concat(placeholder));
   }, [reps]);
+  // Generate and play audio when coach feedback is received
+  useEffect(() => {
+    if (!assistantOutput) return;
+
+    // Combine summary and cues into a single text to speak
+    const textToSpeak = [
+      assistantOutput.summary,
+      ...assistantOutput.cues,
+    ]
+      .filter((text) => text && text.trim())
+      .join(". ");
+
+    if (textToSpeak) {
+      generateAndPlayAudio(textToSpeak).catch((err) =>
+        console.error("Failed to generate audio feedback:", err)
+      );
+    }
+  }, [assistantOutput]);
 
   const displayChecks =
     lastRepChecks ?? (reps.length > 0 ? reps[reps.length - 1].checks : null);
