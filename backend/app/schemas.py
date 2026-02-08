@@ -27,6 +27,7 @@ class SetLevelSummary(BaseModel):
 
 
 CoachMode = Literal["check_in", "set_summary"]
+ExerciseType = Literal["squat", "pushup"]
 
 
 class SetSummaryRequest(BaseModel):
@@ -35,6 +36,7 @@ class SetSummaryRequest(BaseModel):
     reps: list[RepSummaryRequest]
     set_level_summary: Optional[SetLevelSummary] = None
     coach_mode: CoachMode = "set_summary"
+    exercise_type: ExerciseType = "squat"
 
 
 class AssistantOutput(BaseModel):

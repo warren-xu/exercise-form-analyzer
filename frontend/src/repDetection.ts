@@ -195,20 +195,6 @@ export function createRepDetector() {
     const angle = kneeAngleAvg;
     const asymmetry = Math.abs(kneeAngleLeft - kneeAngleRight);
 
-    // Debug logging
-    if (state.frameIndex <= 3 || state.frameIndex % DEBUG_LOG_INTERVAL === 0) {
-      console.log(
-        '[rep] frame', state.frameIndex,
-        'phase', phase,
-        'hipY', hipY.toFixed(3),
-        'hipVel', avgHipVelocity.toFixed(4),
-        'kneeAngle', angle.toFixed(1) + '°',
-        'maxAngle', maxKneeAngle.toFixed(1) + '°',
-        'framesSinceBottom', state.frameIndex - bottomFrame,
-        'asymmetry', asymmetry.toFixed(1) + '°'
-      );
-    }
-
     if (history.length < REP_MIN_FRAMES) return null;
 
     // Warn about asymmetry

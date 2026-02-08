@@ -30,5 +30,19 @@ export const ANKLE_RISE_THRESHOLD = 0.02;
 export const ASYMMETRY_HIP_DIFF_THRESHOLD = 0.05;
 export const ASYMMETRY_KNEE_ANGLE_DIFF_THRESHOLD = 10;
 
+// Pushup form thresholds
+/** Min elbow angle (deg) at bottom for good depth; below = too shallow */
+export const PUSHUP_ELBOW_DEPTH_THRESHOLD = 95;
+/** Max variance of shoulder mid Y (normalized) across rep for "level shoulders" */
+export const PUSHUP_SHOULDER_VARIANCE_THRESHOLD = 0.015;
+/** Max variance of hip mid Y (normalized) across rep for "stable hips" */
+export const PUSHUP_HIP_VARIANCE_THRESHOLD = 0.015;
+/** Max deviation (deg) of shoulder-hip line from horizontal at bottom for plank alignment */
+export const PUSHUP_TORSO_TILT_THRESHOLD_DEG = 15;
+/** Max L-R shoulder height diff (normalized) for symmetry */
+export const PUSHUP_ASYMMETRY_SHOULDER_THRESHOLD = 0.03;
+/** Max L-R elbow angle diff (deg) for symmetry */
+export const PUSHUP_ASYMMETRY_ELBOW_THRESHOLD = 12;
+
 /** Set to true and open DevTools Console to see rep-detection debug logs. */
 export const REP_DEBUG = true;
