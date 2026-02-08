@@ -74,6 +74,10 @@ export function createSmoother(alpha: number = SMOOTHING_ALPHA) {
       r_ankle: smoothPoint(prev.kpts.r_ankle, kpts.r_ankle, alpha),
       l_shoulder: smoothPoint(prev.kpts.l_shoulder, kpts.l_shoulder, alpha),
       r_shoulder: smoothPoint(prev.kpts.r_shoulder, kpts.r_shoulder, alpha),
+      l_elbow: smoothPoint(prev.kpts.l_elbow, kpts.l_elbow, alpha),
+      r_elbow: smoothPoint(prev.kpts.r_elbow, kpts.r_elbow, alpha),
+      l_wrist: smoothPoint(prev.kpts.l_wrist, kpts.l_wrist, alpha),
+      r_wrist: smoothPoint(prev.kpts.r_wrist, kpts.r_wrist, alpha),
     };
     const hipMidYSmoothed = lerp(prev.hipMidY, hipMidY, alpha);
     const confSmoothed = lerp(prev.conf, conf, alpha);
@@ -90,6 +94,10 @@ export function createSmoother(alpha: number = SMOOTHING_ALPHA) {
           r_ankle: smoothPoint3D(prev.kpts3d.r_ankle, kpts3d.r_ankle, alpha),
           l_shoulder: smoothPoint3D(prev.kpts3d.l_shoulder, kpts3d.l_shoulder, alpha),
           r_shoulder: smoothPoint3D(prev.kpts3d.r_shoulder, kpts3d.r_shoulder, alpha),
+          l_elbow: smoothPoint3D(prev.kpts3d.l_elbow, kpts3d.l_elbow, alpha),
+          r_elbow: smoothPoint3D(prev.kpts3d.r_elbow, kpts3d.r_elbow, alpha),
+          l_wrist: smoothPoint3D(prev.kpts3d.l_wrist, kpts3d.l_wrist, alpha),
+          r_wrist: smoothPoint3D(prev.kpts3d.r_wrist, kpts3d.r_wrist, alpha),
         };
       } else {
         kpts3dSmoothed = { ...kpts3d };

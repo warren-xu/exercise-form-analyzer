@@ -14,6 +14,10 @@ export interface Keypoints {
   r_ankle: [number, number];
   l_shoulder: [number, number];
   r_shoulder: [number, number];
+  l_elbow: [number, number];
+  r_elbow: [number, number];
+  l_wrist: [number, number];
+  r_wrist: [number, number];
 }
 
 /** 3D keypoints (MediaPipe world landmarks: x, y, z in meters). */
@@ -26,6 +30,10 @@ export interface Keypoints3D {
   r_ankle: [number, number, number];
   l_shoulder: [number, number, number];
   r_shoulder: [number, number, number];
+  l_elbow: [number, number, number];
+  r_elbow: [number, number, number];
+  l_wrist: [number, number, number];
+  r_wrist: [number, number, number];
 }
 
 export interface FramePayload {

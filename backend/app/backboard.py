@@ -20,12 +20,27 @@ from .schemas import AssistantOutput
 COACH_SYSTEM_PROMPT_CHECK_IN = """You are a supportive gym coach checking in during the user's set. Your role is to:
 1. Check in with the user and encourage them.
 2. Give brief, actionable advice based on the single most critical issue provided (depth, knee tracking, torso angle, heel lift, or asymmetry).
-3. Keep responses short and motivating.
+3. Keep responses short and motivating, starting out with a small positive message like "Great job!" followed by a short sentence describing the advice.
+
+Respond in JSON only, with the key: summary, do not include safety_note. Do not mention safety_note, tracking confidence, camera, or visibility. No markdown, no code fence."""
+
+# Full set summary when the user ends the session (squats).
+COACH_SYSTEM_PROMPT_SET_SUMMARY = """You are a concise gym coach. The user has finished their squat set and wants a session summary. You receive structured form analysis (depth, knee tracking, torso angle, heel lift, asymmetry) for each rep. Your role is to:
+1. Give a 1–2 sentence overall takeaway for the set.
+2. Provide 2–4 prioritized, actionable cues for the next session.
+3. Be direct and helpful; no fluff.
 
 Respond in JSON only, with keys: summary, cues (array of 2–4 short phrases), safety_note. Do not mention tracking confidence, camera, or visibility. No markdown, no code fence."""
 
-# Full set summary when the user ends the session.
-COACH_SYSTEM_PROMPT_SET_SUMMARY = """You are a concise gym coach. The user has finished their squat set and wants a session summary. You receive structured form analysis (depth, knee tracking, torso angle, heel lift, asymmetry) for each rep. Your role is to:
+# Pushup: same response shape; checks map to pushup metrics (depth=elbow ROM, knee_tracking=shoulder stability, torso_angle=plank alignment, heel_lift=hip stability, asymmetry=L-R).
+COACH_SYSTEM_PROMPT_PUSHUP_CHECK_IN = """You are a supportive gym coach checking in during the user's pushup set. Your role is to:
+1. Check in with the user and encourage them.
+2. Give brief, actionable advice based on the single most critical issue provided: depth (elbow range of motion), shoulder stability (level shoulders), body alignment (plank), hip stability (no sag/pike), or asymmetry (left-right balance).
+3. Keep responses short and motivating, starting out with a small positive message like "Great job!" followed by a short sentence describing the advice.
+
+Respond in JSON only, with key: summary, do not include safety_note. Do not mention, tracking confidence, camera, or visibility. No markdown, no code fence."""
+
+COACH_SYSTEM_PROMPT_PUSHUP_SET_SUMMARY = """You are a concise gym coach. The user has finished their pushup set and wants a session summary. You receive structured form analysis for each rep: depth (elbow ROM at bottom), shoulder stability (level shoulders), body alignment (plank line), hip stability (stable hips), asymmetry (left-right). Your role is to:
 1. Give a 1–2 sentence overall takeaway for the set.
 2. Provide 2–4 prioritized, actionable cues for the next session.
 3. Be direct and helpful; no fluff.
@@ -37,6 +52,7 @@ def _build_set_coach_message(
     rep_count: int,
     reps: list,
     set_level_summary: dict | None = None,
+    exercise_type: str = "squat",
 ) -> str:
     """Build the user message containing form data for the assistant."""
     payload = {
@@ -44,8 +60,9 @@ def _build_set_coach_message(
         "reps": reps,
         "set_level_summary": set_level_summary or {},
     }
+    label = "Pushup" if exercise_type == "pushup" else "Squat"
     return (
-        f"Squat set summary: {rep_count} reps.\n"
+        f"{label} set summary: {rep_count} reps.\n"
         "Per-rep and set-level analysis (JSON):\n"
         f"{json.dumps(payload)}"
     )
@@ -86,7 +103,11 @@ def _fallback_output(reason: str, detail: str = "") -> AssistantOutput:
     )
 
 
-def _get_system_prompt(coach_mode: str) -> str:
+def _get_system_prompt(coach_mode: str, exercise_type: str = "squat") -> str:
+    if exercise_type == "pushup":
+        if coach_mode == "check_in":
+            return COACH_SYSTEM_PROMPT_PUSHUP_CHECK_IN
+        return COACH_SYSTEM_PROMPT_PUSHUP_SET_SUMMARY
     if coach_mode == "check_in":
         return COACH_SYSTEM_PROMPT_CHECK_IN
     return COACH_SYSTEM_PROMPT_SET_SUMMARY
@@ -97,6 +118,7 @@ async def get_set_coach_response(
     reps: list,
     set_level_summary: dict | None = None,
     coach_mode: str = "set_summary",
+    exercise_type: str = "squat",
 ) -> AssistantOutput:
     api_key = os.environ.get("BACKBOARD_API_KEY")
     print(f"[DEBUG] BACKBOARD_API_KEY loaded: {bool(api_key)}")
@@ -111,10 +133,12 @@ async def get_set_coach_response(
             confidence_note="Keep feet and knees visible in frame for best tracking.",
         )
 
-    content = _build_set_coach_message(rep_count, reps, set_level_summary)
+    content = _build_set_coach_message(
+        rep_count, reps, set_level_summary, exercise_type
+    )
     llm_provider = os.environ.get("BACKBOARD_LLM_PROVIDER", "openai")
     model_name = os.environ.get("BACKBOARD_MODEL", "gpt-4o-mini")
-    system_prompt = _get_system_prompt(coach_mode)
+    system_prompt = _get_system_prompt(coach_mode, exercise_type)
 
     print(f"[DEBUG] Calling Backboard with provider={llm_provider}, model={model_name}")
 

@@ -7,8 +7,9 @@ import { CoachPanel } from "./CoachPanel";
 import { HistoricalFeedback } from "./HistoricalFeedback";
 import { initPoseLandmarker, detectPose } from "./PoseInferenceEngine";
 import { createMotionAnalysisEngine } from "./MotionAnalysisEngine";
+import { createPushupMotionEngine } from "./PushupMotionEngine";
 import { isBodyReadyForSquat } from "./bodyReadyForSquat";
-import { getSetCoach } from "./api";
+import { getSetCoach, type ExerciseType } from "./api";
 import { generateAndPlayAudio } from "./elevenlabs";
 import type {
   AppPhase,
@@ -94,14 +95,18 @@ export default function App() {
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [assistantError, setAssistantError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  /** Exercise mode: only editable before starting camera (phase Ready, !cameraReady). */
+  const [exerciseType, setExerciseType] = useState<ExerciseType>("squat");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const landmarkerRef = useRef<Awaited<
     ReturnType<typeof initPoseLandmarker>
   > | null>(null);
-  const engineRef = useRef<ReturnType<
-    typeof createMotionAnalysisEngine
-  > | null>(null);
+  const engineRef = useRef<
+    | ReturnType<typeof createMotionAnalysisEngine>
+    | ReturnType<typeof createPushupMotionEngine>
+    | null
+  >(null);
   const sessionIdRef = useRef<string>(generateSessionId());
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
@@ -134,7 +139,10 @@ export default function App() {
     try {
       const lm = await initPoseLandmarker();
       landmarkerRef.current = lm;
-      engineRef.current = createMotionAnalysisEngine();
+      engineRef.current =
+        exerciseType === "pushup"
+          ? createPushupMotionEngine()
+          : createMotionAnalysisEngine();
       sessionIdRef.current = generateSessionId();
       setPhase("Calibrate");
       setLastRepChecks(null);
@@ -152,7 +160,7 @@ export default function App() {
         e instanceof Error ? e.message : "Failed to load pose model",
       );
     }
-  }, []);
+  }, [exerciseType]);
 
   const goLive = useCallback(() => {
     setPhase("Live");
@@ -265,6 +273,7 @@ export default function App() {
         reps,
         undefined,
         "set_summary",
+        exerciseType,
         token,
         userId,
       );
@@ -311,7 +320,7 @@ export default function App() {
     } finally {
       setAssistantLoading(false);
     }
-  }, [reps, stopCamera, getAccessTokenSilently]);
+  }, [reps, stopCamera, getAccessTokenSilently, exerciseType]);
 
   // Call backend every 5 accepted reps with current rep and most critical issue summary
   useEffect(() => {
@@ -327,6 +336,7 @@ export default function App() {
       reps,
       { worst_issues: [mostCritical], consistency_note: "Rep accepted." },
       "check_in",
+      exerciseType,
     )
       .then((output) => {
         setCheckInOutput(output);
@@ -337,7 +347,7 @@ export default function App() {
       .finally(() => {
         setCheckInLoading(false);
       });
-  }, [reps]);
+  }, [reps, exerciseType]);
 
   // Dev function to increment the rep count REMOVE THIS BEFORE DEPLOYING
   const incrementRepCount = useCallback(() => {
@@ -406,12 +416,7 @@ export default function App() {
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>
-            Squat Form Analyzer
-          </h1>
-          <p style={{ margin: "8px 0 0", color: "var(--muted)", fontSize: 14 }}>
-            Camera: 3/4 front or side · Full body in frame · Even lighting
-          </p>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>RepWrite</h1>
         </div>
         <div
           style={{
@@ -557,84 +562,211 @@ export default function App() {
                 )}
               </div>
 
-              {phase === "Live" &&
-            (checkInLoading || checkInOutput || checkInError) && (
-              <div
-                style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  padding: 16,
-                }}
-              >
-                <h3
-                  style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 600 }}
+              {phase === "Live" && (checkInOutput || checkInError) && (
+                <div
+                  style={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    padding: 16,
+                  }}
                 >
-                  Check-in
-                </h3>
-                {checkInLoading && (
-                  <p style={{ margin: 0, color: "var(--muted)", fontSize: 14 }}>
-                    Generating feedback…
-                  </p>
-                )}
-                {!checkInLoading && checkInError && (
-                  <p style={{ margin: 0, color: "var(--flag)", fontSize: 14 }}>
-                    {checkInError}
-                  </p>
-                )}
-                {!checkInLoading && checkInOutput && (
-                  <>
-                    <p style={{ margin: "0 0 10px", lineHeight: 1.5 }}>
-                      {checkInOutput.summary}
+                  <h3
+                    style={{
+                      margin: "0 0 10px",
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: "var(--accent)",
+                    }}
+                  >
+                    Check-in
+                  </h3>
+                  {checkInError && (
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "var(--flag)",
+                        fontSize: 14,
+                      }}
+                    >
+                      {checkInError}
                     </p>
-                    {checkInOutput.cues.length > 0 && (
-                      <ul
+                  )}
+                  {checkInOutput && (
+                    <>
+                      <p
                         style={{
                           margin: "0 0 10px",
-                          paddingLeft: 20,
                           lineHeight: 1.5,
-                          fontSize: 14,
+                          fontSize: 15,
+                          color: "hsl(270 90% 75%)",
                         }}
                       >
-                        {checkInOutput.cues.map((cue, i) => (
-                          <li key={i}>{cue}</li>
-                        ))}
-                      </ul>
-                    )}
-                    <p
-                      style={{ margin: 0, fontSize: 13, color: "var(--watch)" }}
-                    >
-                      {checkInOutput.safety_note}
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
+                        {checkInOutput.summary}
+                      </p>
+                      {checkInOutput.cues.length > 0 && (
+                        <ul
+                          style={{
+                            margin: "0 0 10px",
+                            paddingLeft: 20,
+                            lineHeight: 1.5,
+                            fontSize: 14,
+                            color: "hsl(160 84% 45%)",
+                          }}
+                        >
+                          {checkInOutput.cues.map((cue, i) => (
+                            <li key={i}>{cue}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
 
         <div>
-          <p
-            style={{ margin: "0 0 12px", fontSize: 14, color: "var(--muted)" }}
-          >
-            {phase === "Ready" && "Start camera, then calibrate."}
-            {phase === "Calibrate" &&
-              "Stand still; ensure full body in frame, then start analysis."}
-            {phase === "Live" && (
-              <>
-                Live · Reps: {reps.length}
-                <span style={{ display: "block", fontSize: 12, marginTop: 4 }}>
-                  F12 → Console for [rep] debug logs
+          {phase === "Ready" && (
+            <div style={{ marginBottom: 12 }}>
+              <label
+                htmlFor="exercise-type"
+                style={{
+                  display: "block",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Exercise
+              </label>
+              <select
+                id="exercise-type"
+                value={exerciseType}
+                onChange={(e) =>
+                  setExerciseType(e.target.value as ExerciseType)
+                }
+                disabled={cameraReady}
+                style={{
+                  padding: "8px 12px",
+                  fontSize: 14,
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "inherit",
+                  cursor: cameraReady ? "not-allowed" : "pointer",
+                  opacity: cameraReady ? 0.7 : 1,
+                }}
+              >
+                <option value="squat">Squat</option>
+                <option value="pushup">Push-up</option>
+              </select>
+              {cameraReady && (
+                <p
+                  style={{
+                    margin: "6px 0 0",
+                    fontSize: 12,
+                    color: "var(--muted)",
+                  }}
+                >
+                  Locked after starting camera. Start a new session to change.
+                </p>
+              )}
+            </div>
+          )}
+          {phase === "Live" ? (
+            <div style={{ marginBottom: 16 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 12,
+                  marginBottom: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  Live
                 </span>
-                <button type="button" onClick={incrementRepCount}>
-                  Increment Rep Count
-                </button>
-              </>
-            )}
-            {phase === "RepComplete" && `Rep complete · Reps: ${reps.length}`}
-            {phase === "SetSummary" && "Set summary with coach feedback."}
-          </p>
+                <span
+                  style={{
+                    fontSize: 42,
+                    fontWeight: 700,
+                    color: "var(--accent)",
+                    lineHeight: 1,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {reps.length}
+                </span>
+                <span
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: "var(--muted)",
+                  }}
+                >
+                  reps
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={incrementRepCount}
+                style={{
+                  padding: "12px 20px",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: "var(--accent)",
+                  background: "transparent",
+                  border: "2px solid var(--accent)",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "var(--accent)";
+                  e.currentTarget.style.color = "#fff";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "var(--accent)";
+                }}
+              >
+                + Increment rep
+              </button>
+            </div>
+          ) : (
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: 15,
+                color: "var(--muted)",
+                lineHeight: 1.5,
+              }}
+            >
+              {phase === "Ready" && "Start camera, then calibrate."}
+              {phase === "Calibrate" &&
+                "Stand still; ensure full body in frame, then start analysis."}
+              {phase === "RepComplete" && (
+                <>
+                  <span style={{ fontWeight: 600, color: "var(--ok)" }}>
+                    Rep complete
+                  </span>
+                  {" · "}
+                  <span style={{ fontWeight: 600 }}>{reps.length} reps</span>
+                </>
+              )}
+              {phase === "SetSummary" && "Set summary with coach feedback."}
+            </p>
+          )}
           <StatusCards checks={displayChecks} liveChecks={showLiveChecks} />
           {reps.length > 0 && phase !== "SetSummary" && (
             <button

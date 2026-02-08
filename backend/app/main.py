@@ -144,6 +144,7 @@ async def coach_set(
             reps=[r.model_dump() for r in body.reps],
             set_level_summary=body.set_level_summary.model_dump() if body.set_level_summary is not None else None,
             coach_mode=body.coach_mode,
+            exercise_type=body.exercise_type,
         )
         
         print(f"✓ Got Backboard response: {output.summary[:50] if output.summary else 'No summary'}...")

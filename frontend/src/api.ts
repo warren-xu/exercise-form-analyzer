@@ -46,12 +46,14 @@ function toRepPayload(rep: RepSummary, sessionId: string) {
 }
 
 export type CoachMode = 'check_in' | 'set_summary';
+export type ExerciseType = 'squat' | 'pushup';
 
 export async function getSetCoach(
   sessionId: string,
   reps: RepSummary[],
   setLevelSummary?: { worst_issues?: string[]; trends?: string[]; consistency_note?: string },
   coachMode: CoachMode = 'set_summary',
+  exerciseType: ExerciseType = 'squat',
   accessToken?: string,
   userId?: string
 ): Promise<AssistantOutput> {
@@ -69,6 +71,7 @@ export async function getSetCoach(
       reps: reps.map((r) => toRepPayload(r, sessionId)),
       set_level_summary: setLevelSummary,
       coach_mode: coachMode,
+      exercise_type: exerciseType,
     }),
   });
   

@@ -89,6 +89,10 @@ export function detectPose(
     r_ankle: getLandmark(lm, POSE_LANDMARKS.RIGHT_ANKLE),
     l_shoulder: getLandmark(lm, POSE_LANDMARKS.LEFT_SHOULDER),
     r_shoulder: getLandmark(lm, POSE_LANDMARKS.RIGHT_SHOULDER),
+    l_elbow: getLandmark(lm, POSE_LANDMARKS.LEFT_ELBOW),
+    r_elbow: getLandmark(lm, POSE_LANDMARKS.RIGHT_ELBOW),
+    l_wrist: getLandmark(lm, POSE_LANDMARKS.LEFT_WRIST),
+    r_wrist: getLandmark(lm, POSE_LANDMARKS.RIGHT_WRIST),
   };
 
   let kpts3d: Keypoints3D | null = null;
@@ -103,6 +107,10 @@ export function detectPose(
       r_ankle: getWorldLandmark(wlm, POSE_LANDMARKS.RIGHT_ANKLE),
       l_shoulder: getWorldLandmark(wlm, POSE_LANDMARKS.LEFT_SHOULDER),
       r_shoulder: getWorldLandmark(wlm, POSE_LANDMARKS.RIGHT_SHOULDER),
+      l_elbow: getWorldLandmark(wlm, POSE_LANDMARKS.LEFT_ELBOW),
+      r_elbow: getWorldLandmark(wlm, POSE_LANDMARKS.RIGHT_ELBOW),
+      l_wrist: getWorldLandmark(wlm, POSE_LANDMARKS.LEFT_WRIST),
+      r_wrist: getWorldLandmark(wlm, POSE_LANDMARKS.RIGHT_WRIST),
     };
   }
 
@@ -115,6 +123,10 @@ export function detectPose(
     POSE_LANDMARKS.RIGHT_ANKLE,
     POSE_LANDMARKS.LEFT_SHOULDER,
     POSE_LANDMARKS.RIGHT_SHOULDER,
+    POSE_LANDMARKS.LEFT_ELBOW,
+    POSE_LANDMARKS.RIGHT_ELBOW,
+    POSE_LANDMARKS.LEFT_WRIST,
+    POSE_LANDMARKS.RIGHT_WRIST,
   ];
   const conf = avgVisibility(lm, indices);
   return { kpts, kpts3d, conf };
