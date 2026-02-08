@@ -48,6 +48,8 @@ async def text_to_speech(text: str) -> bytes | None:
         },
     }
     
+    return None  # COMMENT OUT THIS LINE TO ENABLE TTS
+    
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(url, json=payload, headers=headers)
