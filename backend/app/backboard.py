@@ -84,7 +84,11 @@ async def get_set_coach_response(
     set_level_summary: dict | None = None,
 ) -> AssistantOutput:
     api_key = os.environ.get("BACKBOARD_API_KEY")
+    print(f"[DEBUG] BACKBOARD_API_KEY loaded: {bool(api_key)}")
+    print(f"[DEBUG] API Key first 10 chars: {api_key[:10] if api_key else 'NONE'}")
+    
     if not api_key:
+        print("[DEBUG] API key is missing!")
         return AssistantOutput(
             summary="Backboard API key is not configured. Set BACKBOARD_API_KEY to enable AI coaching.",
             cues=["Configure BACKBOARD_API_KEY in the backend to get personalized cues."],
@@ -96,15 +100,20 @@ async def get_set_coach_response(
     llm_provider = os.environ.get("BACKBOARD_LLM_PROVIDER", "openai")
     model_name = os.environ.get("BACKBOARD_MODEL", "gpt-4o-mini")
 
+    print(f"[DEBUG] Calling Backboard with provider={llm_provider}, model={model_name}")
+
     try:
         client = BackboardClient(api_key=api_key)
+        print("[DEBUG] BackboardClient created successfully")
 
         assistant = await client.create_assistant(
             name="Squat Form Coach",
             system_prompt=COACH_SYSTEM_PROMPT,
         )
+        print(f"[DEBUG] Assistant created: {assistant.assistant_id}")
 
         thread = await client.create_thread(assistant.assistant_id)
+        print(f"[DEBUG] Thread created: {thread.thread_id}")
 
         response = await client.add_message(
             thread_id=thread.thread_id,
@@ -113,16 +122,22 @@ async def get_set_coach_response(
             model_name=model_name,
             stream=False,
         )
+        print(f"[DEBUG] Message response received: {type(response)}")
 
         raw = getattr(response, "content", None) or ""
+        print(f"[DEBUG] Response content: {raw[:100]}")
         return _parse_assistant_output(raw)
 
     except (BackboardNotFoundError, BackboardValidationError, BackboardAPIError) as e:
+        print(f"[DEBUG] Backboard API error: {type(e).__name__}: {e}")
         return _fallback_output(
             f"Backboard API error: {e!s}",
             detail=str(e),
         )
     except Exception as e:
+        print(f"[DEBUG] Unexpected error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         return _fallback_output(
             "Could not get coach response from Backboard.",
             detail=str(e),
