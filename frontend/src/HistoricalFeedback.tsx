@@ -3,7 +3,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { getUserHistory, deleteSession, type SessionHistory } from './api';
 
 export function HistoricalFeedback() {
-  const { getAccessTokenSilently } = useAuth0();
+  const { getAccessTokenSilently, getIdTokenClaims } = useAuth0();
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +14,9 @@ export function HistoricalFeedback() {
     setError(null);
     try {
       const token = await getAccessTokenSilently();
-      const data = await getUserHistory(token, 20);
+      const idClaims = await getIdTokenClaims().catch(() => undefined);
+      const userId = idClaims?.sub;
+      const data = await getUserHistory(token, 20, userId);
       setHistory(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load history');
@@ -31,7 +33,9 @@ export function HistoricalFeedback() {
     if (!confirm('Delete this session?')) return;
     try {
       const token = await getAccessTokenSilently();
-      await deleteSession(sessionId, token);
+      const idClaims = await getIdTokenClaims().catch(() => undefined);
+      const userId = idClaims?.sub;
+      await deleteSession(sessionId, token, userId);
       setHistory(prev => prev.filter(s => s.session_id !== sessionId));
     } catch (err) {
       alert('Failed to delete session');
@@ -40,7 +44,8 @@ export function HistoricalFeedback() {
 
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleString('en-US', {
+      timeZone: 'America/New_York',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -144,7 +149,23 @@ export function HistoricalFeedback() {
                     Coach Feedback:
                   </div>
                   <div style={{ whiteSpace: 'pre-wrap', color: 'var(--fg)' }}>
-                    {session.assistant_feedback.message}
+                    {session.assistant_feedback.summary || 'No summary available.'}
+                    {Array.isArray(session.assistant_feedback.cues) && session.assistant_feedback.cues.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontWeight: 500, marginBottom: 4 }}>Cues:</div>
+                        <ul style={{ margin: 0, paddingLeft: 16 }}>
+                          {session.assistant_feedback.cues.map((cue, idx) => (
+                            <li key={idx}>{cue}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {session.assistant_feedback.safety_note && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontWeight: 500, marginBottom: 4 }}>Safety:</div>
+                        <div>{session.assistant_feedback.safety_note}</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

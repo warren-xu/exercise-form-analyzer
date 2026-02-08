@@ -38,6 +38,9 @@ class AssistantOutput(BaseModel):
     cues: list[str]
     safety_note: str
     confidence_note: Optional[str] = None
+    saved_to_db: bool = False
+    db_session_id: Optional[str] = None
+    debug_info: Optional[dict] = None
 
 
 class RepCueResponse(BaseModel):

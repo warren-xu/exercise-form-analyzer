@@ -28,7 +28,7 @@ function generateSessionId(): string {
 }
 
 export default function App() {
-  const { user, logout, getAccessTokenSilently } = useAuth0();
+  const { user, logout, getAccessTokenSilently, getIdTokenClaims } = useAuth0();
   const [phase, setPhase] = useState<AppPhase>("Ready");
   const [videoSize, setVideoSize] = useState({ width: 640, height: 480 });
   const [currentKeypoints, setCurrentKeypoints] = useState<
@@ -182,7 +182,39 @@ export default function App() {
     setAssistantError(null);
     try {
       const token = await getAccessTokenSilently().catch(() => undefined);
-      const output = await getSetCoach(sessionIdRef.current, reps, undefined, token);
+      const idClaims = await getIdTokenClaims().catch(() => undefined);
+      const userId = idClaims?.sub;
+      console.log('🔍 Access token retrieved:', token ? `${token.substring(0, 20)}...` : 'undefined');
+      const output = await getSetCoach(sessionIdRef.current, reps, undefined, token, userId);
+      
+      // Log MongoDB save status
+      console.log('\n' + '='.repeat(80));
+      console.log('💾 MONGODB SAVE STATUS');
+      console.log('='.repeat(80));
+      console.log('Session saved to database:', output.saved_to_db);
+      if (output.saved_to_db && output.db_session_id) {
+        console.log('✅ Database session ID:', output.db_session_id);
+        console.log('✅ Session ID:', sessionIdRef.current);
+        console.log('✅ Rep count:', reps.length);
+      } else {
+        console.log('❌ Session was NOT saved to database');
+      }
+      
+      // Show detailed debug info
+      if (output.debug_info) {
+        console.log('\n🔍 DEBUG INFO:');
+        console.log('  Authorization received:', output.debug_info.authorization_received);
+        console.log('  MongoDB save attempted:', output.debug_info.mongodb_attempted);
+        if (output.debug_info.error) {
+          console.log('  Error:', output.debug_info.error);
+        }
+        console.log('\n📝 Backend logs:');
+        output.debug_info.logs?.forEach((log: string, i: number) => {
+          console.log(`  ${i + 1}. ${log}`);
+        });
+      }
+      console.log('='.repeat(80) + '\n');
+      
       setAssistantOutput(output);
       setPhase("SetSummary");
       stopCamera();

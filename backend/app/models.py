@@ -3,12 +3,12 @@ MongoDB models for session and feedback storage
 """
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 class RepData(BaseModel):
     """Individual rep data"""
     rep_index: int
-    confidence: float
+    confidence: dict
     checks: dict
 
 class SessionModel(BaseModel):
@@ -16,7 +16,7 @@ class SessionModel(BaseModel):
     user_id: str = Field(..., description="Auth0 user ID")
     user_email: Optional[str] = None
     session_id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     rep_count: int
     reps: List[RepData]
     assistant_feedback: Optional[dict] = None

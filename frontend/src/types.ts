@@ -54,6 +54,14 @@ export interface AssistantOutput {
   cues: string[];
   safety_note: string;
   confidence_note?: string;
+  saved_to_db?: boolean;
+  db_session_id?: string;
+  debug_info?: {
+    logs?: string[];
+    authorization_received?: boolean;
+    mongodb_attempted?: boolean;
+    error?: string;
+  };
 }
 
 export type AppPhase =
