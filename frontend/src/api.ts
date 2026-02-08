@@ -55,6 +55,7 @@ export async function getSetCoach(
   setLevelSummary?: { worst_issues?: string[]; trends?: string[]; consistency_note?: string },
   coachMode: CoachMode = 'set_summary',
   exerciseType: ExerciseType = 'squat',
+  coachName?: string | null,
   accessToken?: string,
   userId?: string
 ): Promise<AssistantOutput> {
@@ -73,6 +74,7 @@ export async function getSetCoach(
       set_level_summary: setLevelSummary,
       coach_mode: coachMode,
       exercise_type: exerciseType,
+      ...(coachName != null && coachName.trim() !== '' && { coach_name: coachName.trim() }),
     }),
   });
   

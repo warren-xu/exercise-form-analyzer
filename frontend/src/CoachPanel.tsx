@@ -8,13 +8,17 @@ export interface CoachPanelProps {
   output: AssistantOutput | null;
   loading?: boolean;
   error?: string | null;
+  /** Display name of the coach (e.g. from voice settings). */
+  coachName?: string | null;
 }
 
-export function CoachPanel({ output, loading, error }: CoachPanelProps) {
+export function CoachPanel({ output, loading, error, coachName }: CoachPanelProps) {
+  const heading = (coachName && coachName.trim()) ? coachName.trim() : 'Coach';
+
   if (error) {
     return (
       <div style={panelStyle}>
-        <h3 style={headingStyle}>Coach</h3>
+        <h3 style={headingStyle}>{heading}</h3>
         <p style={{ color: 'var(--flag)' }}>{error}</p>
       </div>
     );
@@ -23,7 +27,7 @@ export function CoachPanel({ output, loading, error }: CoachPanelProps) {
   if (loading) {
     return (
       <div style={panelStyle}>
-        <h3 style={headingStyle}>Coach</h3>
+        <h3 style={headingStyle}>{heading}</h3>
         <p style={{ color: 'var(--muted)' }}>Getting feedback…</p>
       </div>
     );
@@ -32,7 +36,7 @@ export function CoachPanel({ output, loading, error }: CoachPanelProps) {
   if (!output) {
     return (
       <div style={panelStyle}>
-        <h3 style={headingStyle}>Coach</h3>
+        <h3 style={headingStyle}>{heading}</h3>
         <p style={{ color: 'var(--muted)' }}>
           Complete a set and tap “Get coach feedback” to see personalized cues.
         </p>
@@ -42,7 +46,7 @@ export function CoachPanel({ output, loading, error }: CoachPanelProps) {
 
   return (
     <div style={panelStyle}>
-      <h3 style={headingStyle}>Coach</h3>
+      <h3 style={headingStyle}>{heading}</h3>
       <p style={summaryStyle}>{output.summary}</p>
       {output.cues.length > 0 && (
         <ul style={listStyle}>

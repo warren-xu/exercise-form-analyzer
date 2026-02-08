@@ -285,12 +285,15 @@ export default function App() {
         "🔍 Access token retrieved:",
         token ? `${token.substring(0, 20)}...` : "undefined",
       );
+      const coachName =
+        VOICE_OPTIONS.find((v) => v.id === coachVoiceId)?.label ?? undefined;
       const output = await getSetCoach(
         sessionIdRef.current,
         reps,
         undefined,
         "set_summary",
         exerciseType,
+        coachName,
         token,
         userId,
       );
@@ -335,7 +338,7 @@ export default function App() {
     } finally {
       setAssistantLoading(false);
     }
-  }, [reps, stopCamera, getAccessTokenSilently, exerciseType]);
+  }, [reps, stopCamera, getAccessTokenSilently, exerciseType, coachVoiceId]);
 
   // Call backend every 5 accepted reps with current rep and most critical issue summary
   useEffect(() => {
@@ -346,12 +349,15 @@ export default function App() {
     const mostCritical = getMostCriticalIssue(currentRep);
     setCheckInLoading(true);
     setCheckInError(null);
+    const checkInCoachName =
+      VOICE_OPTIONS.find((v) => v.id === checkInVoiceId)?.label ?? undefined;
     getSetCoach(
       sessionIdRef.current,
       reps,
       { worst_issues: [mostCritical], consistency_note: "Rep accepted." },
       "check_in",
       exerciseType,
+      checkInCoachName,
     )
       .then((output) => {
         setCheckInOutput(output);
@@ -362,7 +368,7 @@ export default function App() {
       .finally(() => {
         setCheckInLoading(false);
       });
-  }, [reps, exerciseType]);
+  }, [reps, exerciseType, checkInVoiceId]);
 
   // Dev function to increment the rep count REMOVE THIS BEFORE DEPLOYING
   const incrementRepCount = useCallback(() => {
@@ -594,7 +600,9 @@ export default function App() {
                       color: "var(--accent)",
                     }}
                   >
-                    Check-in
+                    Check-in by{" "}
+                    {VOICE_OPTIONS.find((v) => v.id === checkInVoiceId)?.label ??
+                      "Coach"}
                   </h3>
                   {checkInError && (
                     <p
@@ -870,6 +878,7 @@ export default function App() {
             output={assistantOutput}
             loading={assistantLoading}
             error={assistantError}
+            coachName={VOICE_OPTIONS.find((v) => v.id === coachVoiceId)?.label}
           />
         </div>
       </div>

@@ -37,6 +37,7 @@ class SetSummaryRequest(BaseModel):
     set_level_summary: Optional[SetLevelSummary] = None
     coach_mode: CoachMode = "set_summary"
     exercise_type: ExerciseType = "squat"
+    coach_name: Optional[str] = None
 
 
 class AssistantOutput(BaseModel):

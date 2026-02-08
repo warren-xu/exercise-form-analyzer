@@ -20,7 +20,7 @@ from .schemas import AssistantOutput
 COACH_SYSTEM_PROMPT_CHECK_IN = """You are a supportive gym coach checking in during the user's set. Your role is to:
 1. Check in with the user and encourage them.
 2. Give brief, actionable advice based on the single most critical issue provided (depth, knee tracking, torso angle, heel lift, or asymmetry).
-3. Keep responses short and motivating, starting out with a small positive message like "Great job!" followed by a short sentence describing the advice.
+3. Keep responses short and motivating, with a very short one-liner describing the advice.
 
 Respond in JSON only, with the key: summary, do not include safety_note. Do not mention safety_note, tracking confidence, camera, or visibility. No markdown, no code fence."""
 
@@ -36,7 +36,7 @@ Respond in JSON only, with keys: summary, cues (array of 2–4 short phrases), s
 COACH_SYSTEM_PROMPT_PUSHUP_CHECK_IN = """You are a supportive gym coach checking in during the user's pushup set. Your role is to:
 1. Check in with the user and encourage them.
 2. Give brief, actionable advice based on the single most critical issue provided: depth (elbow range of motion), shoulder stability (level shoulders), body alignment (plank), hip stability (no sag/pike), or asymmetry (left-right balance).
-3. Keep responses short and motivating, starting out with a small positive message like "Great job!" followed by a short sentence describing the advice.
+3. Keep responses short and motivating, with a very short one-liner describing the advice.
 
 Respond in JSON only, with key: summary, do not include safety_note. Do not mention, tracking confidence, camera, or visibility. No markdown, no code fence."""
 
@@ -119,6 +119,7 @@ async def get_set_coach_response(
     set_level_summary: dict | None = None,
     coach_mode: str = "set_summary",
     exercise_type: str = "squat",
+    coach_name: str | None = None,
 ) -> AssistantOutput:
     api_key = os.environ.get("BACKBOARD_API_KEY")
     print(f"[DEBUG] BACKBOARD_API_KEY loaded: {bool(api_key)}")
@@ -143,8 +144,9 @@ async def get_set_coach_response(
     try:
         client = BackboardClient(api_key=api_key)
 
+        assistant_display_name = (coach_name or "Coach").strip() or "Coach"
         assistant = await client.create_assistant(
-            name="RepRight Form Coach",
+            name=assistant_display_name,
             system_prompt=system_prompt,
         )
 

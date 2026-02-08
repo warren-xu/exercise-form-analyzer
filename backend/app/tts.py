@@ -46,6 +46,7 @@ async def text_to_speech(text: str, voice_id: str | None = None) -> bytes | None
             "stability": 0.5,
             "similarity_boost": 0.75,
         },
+        "model_id": "eleven_flash_v2",
     }
     
     #return None  # COMMENT OUT THIS LINE TO ENABLE TTS
