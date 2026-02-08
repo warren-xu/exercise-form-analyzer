@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .backboard import get_set_coach_response
 from .database import connect_to_mongo, close_mongo_connection, get_sessions_collection
 from .models import SessionModel, SessionResponse, RepData
+from .analysis import analyzer
+from .snowflake import close_client as close_snowflake_client
 from .schemas import (
     AssistantOutput,
     RepCueResponse,
@@ -26,12 +28,12 @@ from .schemas import (
     ErrorDetail,
 )
 
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await connect_to_mongo()
     yield
     await close_mongo_connection()
+    close_snowflake_client()
 
 
 app = FastAPI(
@@ -70,6 +72,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from app.snowflake_analysis import (
+    get_avg_score_per_session,
+    get_feedback_distribution,
+    get_score_trend
+)
+
+# Endpoint: Get average score per session (bar chart)
+@app.get("/api/analysis/avg-score")
+async def avg_score():
+    data = get_avg_score_per_session()
+    return {"avg_score_per_session": data}
+
+# Endpoint: Get feedback distribution (pie chart)
+@app.get("/api/analysis/feedback-distribution")
+async def feedback_distribution():
+    data = get_feedback_distribution()
+    return {"feedback_distribution": data}
+
+# Endpoint: Get score trend for a user (line chart)
+@app.get("/api/analysis/score-trend/{user_id}")
+async def score_trend(user_id: str):
+    data = get_score_trend(user_id)
+    return {"score_trend": data}
+
+
+
+
 
 
 @app.get("/api/health")
@@ -212,6 +242,32 @@ async def coach_set(
             status_code=502,
             detail=str(e),
         )
+
+
+@app.get("/api/analysis/{session_id}")
+async def analyze_session(
+    session_id: str,
+    authorization: str = Header(None),
+    user_id_header: Optional[str] = Header(None, alias="X-User-Id"),
+):
+    """Analyze a session and provide form insights, trends, and recommendations."""
+    if not authorization or not authorization.startswith('Bearer '):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    user_id = resolve_user_id(authorization, user_id_header)
+    
+    try:
+        analysis = await analyzer.analyze_session(session_id, user_id)
+        
+        if "error" in analysis:
+            raise HTTPException(status_code=404, detail=analysis["error"])
+        
+        return analysis
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Analysis error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get(
