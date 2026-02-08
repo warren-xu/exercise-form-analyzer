@@ -27,9 +27,9 @@ const HIP_VELOCITY_WINDOW = 5;
 /** Hip velocity threshold: Y per frame to detect descent/ascent */
 const HIP_VELOCITY_THRESHOLD = 0.0015;
 /** Minimum knee flexion (degrees bent from straight) to count as a valid squat: maxKneeAngle >= this */
-const MIN_KNEE_FLEXION = 25;
+const MIN_KNEE_FLEXION = 70;
 /** Minimum time for a rep (seconds) */
-const MIN_REP_DURATION_SEC = 0.75;
+const MIN_REP_DURATION_SEC = 0.55;
 /** Maximum time for a rep (seconds) */
 const MAX_REP_DURATION_SEC = 5.0;
 /** Cooldown frames after counting */
@@ -64,20 +64,52 @@ export function createRepDetector() {
   let committed = false;
   let lastCountedAtFrame = 0;
 
-  function calculateKneeAngle(
+  /** Knee angle from 2D keypoints (fallback when 3D unavailable). */
+  function calculateKneeAngle2D(
     hip: [number, number],
     knee: [number, number],
     ankle: [number, number]
   ): number {
     const hipKnee = { x: knee[0] - hip[0], y: knee[1] - hip[1] };
     const kneeAnkle = { x: ankle[0] - knee[0], y: ankle[1] - knee[1] };
-    
     const dot = hipKnee.x * kneeAnkle.x + hipKnee.y * kneeAnkle.y;
     const mag1 = Math.sqrt(hipKnee.x ** 2 + hipKnee.y ** 2);
     const mag2 = Math.sqrt(kneeAnkle.x ** 2 + kneeAnkle.y ** 2);
-    
     if (mag1 === 0 || mag2 === 0) return 180;
-    
+    const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+    return Math.acos(cosAngle) * (180 / Math.PI);
+  }
+
+  /**
+   * Knee angle from MediaPipe 3D world landmarks (meters).
+   * Uses the 3D vectors hip→knee and knee→ankle; angle is invariant to camera angle.
+   */
+  function calculateKneeAngle3D(
+    hip: [number, number, number],
+    knee: [number, number, number],
+    ankle: [number, number, number]
+  ): number {
+    const hipKnee = [
+      knee[0] - hip[0],
+      knee[1] - hip[1],
+      knee[2] - hip[2],
+    ];
+    const kneeAnkle = [
+      ankle[0] - knee[0],
+      ankle[1] - knee[1],
+      ankle[2] - knee[2],
+    ];
+    const dot =
+      hipKnee[0] * kneeAnkle[0] +
+      hipKnee[1] * kneeAnkle[1] +
+      hipKnee[2] * kneeAnkle[2];
+    const mag1 = Math.sqrt(
+      hipKnee[0] ** 2 + hipKnee[1] ** 2 + hipKnee[2] ** 2
+    );
+    const mag2 = Math.sqrt(
+      kneeAnkle[0] ** 2 + kneeAnkle[1] ** 2 + kneeAnkle[2] ** 2
+    );
+    if (mag1 === 0 || mag2 === 0) return 180;
     const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
     return Math.acos(cosAngle) * (180 / Math.PI);
   }
@@ -120,17 +152,21 @@ export function createRepDetector() {
   }
 
   function addFrame(state: SmoothedState): RepWindow | null {
-    // Calculate knee angles
-    const kneeAngleLeft = calculateKneeAngle(
-      state.kpts.l_hip,
-      state.kpts.l_knee,
-      state.kpts.l_ankle
-    );
-    const kneeAngleRight = calculateKneeAngle(
-      state.kpts.r_hip,
-      state.kpts.r_knee,
-      state.kpts.r_ankle
-    );
+    const kpts3d = state.kpts3d;
+    const kneeAngleLeft = kpts3d
+      ? calculateKneeAngle3D(kpts3d.l_hip, kpts3d.l_knee, kpts3d.l_ankle)
+      : calculateKneeAngle2D(
+          state.kpts.l_hip,
+          state.kpts.l_knee,
+          state.kpts.l_ankle
+        );
+    const kneeAngleRight = kpts3d
+      ? calculateKneeAngle3D(kpts3d.r_hip, kpts3d.r_knee, kpts3d.r_ankle)
+      : calculateKneeAngle2D(
+          state.kpts.r_hip,
+          state.kpts.r_knee,
+          state.kpts.r_ankle
+        );
     const kneeAngleAvg = (kneeAngleLeft + kneeAngleRight) / 2;
     
     const frameData: FrameData = {

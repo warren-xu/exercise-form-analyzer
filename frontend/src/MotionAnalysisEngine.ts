@@ -20,7 +20,8 @@ export function createMotionAnalysisEngine() {
 
   function processFrame(
     kpts: SmoothedState['kpts'],
-    conf: number
+    conf: number,
+    kpts3d?: SmoothedState['kpts3d'] | null
   ): {
     state: SmoothedState;
     repComplete: RepSummary | null;
@@ -32,7 +33,7 @@ export function createMotionAnalysisEngine() {
       asymmetry: RepCheckResult;
     };
   } {
-    const state = smooth(kpts, conf);
+    const state = smooth(kpts, conf, kpts3d);
     smoothedFrames.push(state);
     if (smoothedFrames.length > maxFrames) smoothedFrames.shift();
 
@@ -84,9 +85,10 @@ export function createMotionAnalysisEngine() {
   return {
     processFrame(
       kpts: SmoothedState['kpts'],
-      conf: number
+      conf: number,
+      kpts3d?: SmoothedState['kpts3d'] | null
     ): { state: SmoothedState; repComplete: RepSummary | null; liveChecks: ReturnType<typeof computeLiveChecks> } {
-      return processFrame(kpts, conf);
+      return processFrame(kpts, conf, kpts3d);
     },
     reset(): void {
       repDetector.reset();

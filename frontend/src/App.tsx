@@ -41,7 +41,6 @@ export default function App() {
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [assistantError, setAssistantError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
-  const [bodyReadyForTracking, setBodyReadyForTracking] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const landmarkerRef = useRef<Awaited<
@@ -148,13 +147,15 @@ export default function App() {
         );
       }
       if (!result) return;
-
-      setBodyReadyForTracking(true);
       const {
         state,
         repComplete,
         liveChecks: nextLiveChecks,
-      } = engine.processFrame(result.kpts, result.conf);
+      } = engine.processFrame(
+        result.kpts,
+        result.conf,
+        result.kpts3d ?? undefined,
+      );
       setCurrentKeypoints(state.kpts);
       setLiveChecks(nextLiveChecks);
 
@@ -188,6 +189,26 @@ export default function App() {
       setAssistantLoading(false);
     }
   }, [reps, stopCamera]);
+
+  // Dev function to increment the rep count REMOVE THIS BEFORE DEPLOYING
+  const incrementRepCount = useCallback(() => {
+    const placeholder: RepSummary = {
+      rep_index: reps.length + 1,
+      start_frame: 0,
+      bottom_frame: 50,
+      end_frame: 100,
+      rep_confidence: 1,
+      confidence: { pose_avg: 1, warnings: [] },
+      checks: {
+        depth: { severity: "low", status: "ok", evidence: {} },
+        knee_tracking: { severity: "low", status: "ok", evidence: {} },
+        torso_angle: { severity: "low", status: "ok", evidence: {} },
+        heel_lift: { severity: "low", status: "ok", evidence: {} },
+        asymmetry: { severity: "low", status: "ok", evidence: {} },
+      },
+    };
+    setReps((prev) => prev.concat(placeholder));
+  }, [reps]);
 
   const displayChecks =
     lastRepChecks ?? (reps.length > 0 ? reps[reps.length - 1].checks : null);
@@ -289,6 +310,9 @@ export default function App() {
                 <span style={{ display: "block", fontSize: 12, marginTop: 4 }}>
                   F12 → Console for [rep] debug logs
                 </span>
+                <button type="button" onClick={incrementRepCount}>
+                  Increment Rep Count
+                </button>
               </>
             )}
             {phase === "RepComplete" && `Rep complete · Reps: ${reps.length}`}
