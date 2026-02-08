@@ -33,10 +33,13 @@ function toRepPayload(rep: RepSummary, sessionId: string) {
   };
 }
 
+export type CoachMode = 'check_in' | 'set_summary';
+
 export async function getSetCoach(
   sessionId: string,
   reps: RepSummary[],
-  setLevelSummary?: { worst_issues?: string[]; trends?: string[]; consistency_note?: string }
+  setLevelSummary?: { worst_issues?: string[]; trends?: string[]; consistency_note?: string },
+  coachMode: CoachMode = 'set_summary'
 ): Promise<AssistantOutput> {
   const res = await fetch(`${API_BASE}/coach/set`, {
     method: 'POST',
@@ -46,6 +49,7 @@ export async function getSetCoach(
       rep_count: reps.length,
       reps: reps.map((r) => toRepPayload(r, sessionId)),
       set_level_summary: setLevelSummary,
+      coach_mode: coachMode,
     }),
   });
   if (!res.ok) {

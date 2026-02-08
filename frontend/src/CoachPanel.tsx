@@ -52,9 +52,6 @@ export function CoachPanel({ output, loading, error }: CoachPanelProps) {
         </ul>
       )}
       <p style={safetyStyle}>{output.safety_note}</p>
-      {output.confidence_note && (
-        <p style={confidenceStyle}>{output.confidence_note}</p>
-      )}
     </div>
   );
 }
@@ -92,10 +89,4 @@ const safetyStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 14,
   color: 'var(--watch)',
-};
-
-const confidenceStyle: React.CSSProperties = {
-  margin: '8px 0 0',
-  fontSize: 13,
-  color: 'var(--muted)',
 };

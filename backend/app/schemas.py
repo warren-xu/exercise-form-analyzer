@@ -26,11 +26,15 @@ class SetLevelSummary(BaseModel):
     consistency_note: Optional[str] = None
 
 
+CoachMode = Literal["check_in", "set_summary"]
+
+
 class SetSummaryRequest(BaseModel):
     session_id: str
     rep_count: int
     reps: list[RepSummaryRequest]
     set_level_summary: Optional[SetLevelSummary] = None
+    coach_mode: CoachMode = "set_summary"
 
 
 class AssistantOutput(BaseModel):

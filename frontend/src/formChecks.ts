@@ -61,7 +61,8 @@ export function computeFormChecks(
   const ankleBaselineY = Math.max(k.l_ankle[1], k.r_ankle[1]);
   const bodyHeight = Math.abs(ankleBaselineY - shoulderMidY) || 0.01;
 
-  const hipDropNorm = (topY - bottomY) / bodyHeight;
+  // Hip drop: how much the hip moved down (bottom has larger Y in normalized coords)
+  const hipDropNorm = (bottomY - topY) / bodyHeight;
   const bottomKneeAngleL = angleDeg(
     k.l_hip[0], k.l_hip[1],
     k.l_knee[0], k.l_knee[1],

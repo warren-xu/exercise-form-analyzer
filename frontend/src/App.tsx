@@ -8,10 +8,47 @@ import { createMotionAnalysisEngine } from "./MotionAnalysisEngine";
 import { isBodyReadyForSquat } from "./bodyReadyForSquat";
 import { getSetCoach } from "./api";
 import { generateAndPlayAudio } from "./elevenlabs";
-import type { AppPhase } from "./types";
-import type { RepSummary, RepCheckResult } from "./types";
-import type { AssistantOutput } from "./types";
+import type { AppPhase, RepSummary, RepCheckResult, AssistantOutput, Severity } from "./types";
 import type { SmoothedState } from "./smoothing";
+
+const CHECK_ORDER: (keyof RepSummary["checks"])[] = [
+  "depth",
+  "knee_tracking",
+  "torso_angle",
+  "heel_lift",
+  "asymmetry",
+];
+const CHECK_LABELS: Record<keyof RepSummary["checks"], string> = {
+  depth: "Depth",
+  knee_tracking: "Knee tracking",
+  torso_angle: "Torso angle",
+  heel_lift: "Heel lift",
+  asymmetry: "Asymmetry",
+};
+const SEVERITY_RANK: Record<Severity, number> = {
+  high: 3,
+  moderate: 2,
+  low: 1,
+};
+
+/** One-line summary of the single most critical form issue for the backend. */
+function getMostCriticalIssue(rep: RepSummary): string {
+  let worstKey: keyof RepSummary["checks"] | null = null;
+  let worstRank = 0;
+  for (const key of CHECK_ORDER) {
+    const r = rep.checks[key];
+    const rank = SEVERITY_RANK[r.severity];
+    if (rank > worstRank) {
+      worstRank = rank;
+      worstKey = key;
+    }
+  }
+  if (!worstKey || worstRank <= SEVERITY_RANK.low)
+    return "No critical issue; keep consistency.";
+  const check = rep.checks[worstKey];
+  const label = CHECK_LABELS[worstKey];
+  return check.cue ? `${label}: ${check.cue}` : `${label} needs attention.`;
+}
 
 type LiveChecksMap = {
   depth: RepCheckResult;
@@ -39,6 +76,10 @@ export default function App() {
   const [reps, setReps] = useState<RepSummary[]>([]);
   const [assistantOutput, setAssistantOutput] =
     useState<AssistantOutput | null>(null);
+  /** Every-5-reps check-in feedback (shown in panel under live feed) */
+  const [checkInOutput, setCheckInOutput] = useState<AssistantOutput | null>(null);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkInError, setCheckInError] = useState<string | null>(null);
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [assistantError, setAssistantError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
@@ -54,6 +95,7 @@ export default function App() {
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
+  const lastCheckInRepsSentRef = useRef<number>(0);
 
   const onVideoRef = useCallback((el: HTMLVideoElement | null) => {
     videoRef.current = el;
@@ -87,7 +129,11 @@ export default function App() {
       setLastRepChecks(null);
       setLiveChecks(null);
       setReps([]);
+      lastCheckInRepsSentRef.current = 0;
       setAssistantOutput(null);
+      setCheckInOutput(null);
+      setCheckInLoading(false);
+      setCheckInError(null);
       setAssistantError(null);
     } catch (e) {
       console.error(e);
@@ -191,6 +237,32 @@ export default function App() {
     }
   }, [reps, stopCamera]);
 
+  // Call backend every 5 accepted reps with current rep and most critical issue summary
+  useEffect(() => {
+    const n = reps.length;
+    if (n === 0 || n % 5 !== 0 || n === lastCheckInRepsSentRef.current) return;
+    lastCheckInRepsSentRef.current = n;
+    const currentRep = reps[n - 1];
+    const mostCritical = getMostCriticalIssue(currentRep);
+    setCheckInLoading(true);
+    setCheckInError(null);
+    getSetCoach(
+      sessionIdRef.current,
+      reps,
+      { worst_issues: [mostCritical], consistency_note: "Rep accepted." },
+      "check_in"
+    )
+      .then((output) => {
+        setCheckInOutput(output);
+      })
+      .catch((e) => {
+        setCheckInError(e instanceof Error ? e.message : "Set coach failed");
+      })
+      .finally(() => {
+        setCheckInLoading(false);
+      });
+  }, [reps]);
+
   // Dev function to increment the rep count REMOVE THIS BEFORE DEPLOYING
   const incrementRepCount = useCallback(() => {
     const placeholder: RepSummary = {
@@ -210,24 +282,31 @@ export default function App() {
     };
     setReps((prev) => prev.concat(placeholder));
   }, [reps]);
-  // Generate and play audio when coach feedback is received
+  // Generate and play audio when coach feedback is received (manual "Get coach feedback")
   useEffect(() => {
     if (!assistantOutput) return;
-
-    // Combine summary and cues into a single text to speak
-    const textToSpeak = [
-      assistantOutput.summary,
-      ...assistantOutput.cues,
-    ]
+    const textToSpeak = [assistantOutput.summary, ...assistantOutput.cues]
       .filter((text) => text && text.trim())
       .join(". ");
-
     if (textToSpeak) {
       generateAndPlayAudio(textToSpeak).catch((err) =>
         console.error("Failed to generate audio feedback:", err)
       );
     }
   }, [assistantOutput]);
+
+  // Play check-in feedback when every-5-reps response arrives
+  useEffect(() => {
+    if (!checkInOutput) return;
+    const textToSpeak = [checkInOutput.summary, ...checkInOutput.cues]
+      .filter((text) => text && text.trim())
+      .join(". ");
+    if (textToSpeak) {
+      generateAndPlayAudio(textToSpeak).catch((err) =>
+        console.error("Failed to generate audio check-in:", err)
+      );
+    }
+  }, [checkInOutput]);
 
   const displayChecks =
     lastRepChecks ?? (reps.length > 0 ? reps[reps.length - 1].checks : null);
@@ -260,58 +339,109 @@ export default function App() {
           alignItems: "start",
         }}
       >
-        <div
-          style={{
-            position: "relative",
-            background: "#000",
-            borderRadius: 12,
-            overflow: "hidden",
-          }}
-        >
-          <WebcamCapture
-            onStream={onStream}
-            onVideoRef={onVideoRef}
-            className={undefined}
-          />
-          {currentKeypoints && phase === "Live" && (
-            <OverlayRenderer
-              keypoints={currentKeypoints}
-              width={videoSize.width}
-              height={videoSize.height}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div
+            style={{
+              position: "relative",
+              background: "#000",
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
+            <WebcamCapture
+              onStream={onStream}
+              onVideoRef={onVideoRef}
+              className={undefined}
             />
-          )}
-          {phase === "Calibrate" && cameraReady && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 16,
-                left: "50%",
-                transform: "translateX(-50%)",
-                display: "flex",
-                gap: 8,
-              }}
-            >
-              <button type="button" onClick={goLive} style={primaryButtonStyle}>
-                Start analysis
-              </button>
-            </div>
-          )}
-          {phase === "Ready" && cameraReady && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 16,
-                left: "50%",
-                transform: "translateX(-50%)",
-              }}
-            >
-              <button
-                type="button"
-                onClick={startInference}
-                style={primaryButtonStyle}
+            {currentKeypoints && phase === "Live" && (
+              <OverlayRenderer
+                keypoints={currentKeypoints}
+                width={videoSize.width}
+                height={videoSize.height}
+              />
+            )}
+            {phase === "Calibrate" && cameraReady && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 16,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  gap: 8,
+                }}
               >
-                Calibrate & start
-              </button>
+                <button type="button" onClick={goLive} style={primaryButtonStyle}>
+                  Start analysis
+                </button>
+              </div>
+            )}
+            {phase === "Ready" && cameraReady && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 16,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={startInference}
+                  style={primaryButtonStyle}
+                >
+                  Calibrate & start
+                </button>
+              </div>
+            )}
+          </div>
+
+          {phase === "Live" && (checkInLoading || checkInOutput || checkInError) && (
+            <div
+              style={{
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 16,
+              }}
+            >
+              <h3 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 600 }}>
+                Check-in
+              </h3>
+              {checkInLoading && (
+                <p style={{ margin: 0, color: "var(--muted)", fontSize: 14 }}>
+                  Generating feedback…
+                </p>
+              )}
+              {!checkInLoading && checkInError && (
+                <p style={{ margin: 0, color: "var(--flag)", fontSize: 14 }}>
+                  {checkInError}
+                </p>
+              )}
+              {!checkInLoading && checkInOutput && (
+                <>
+                  <p style={{ margin: "0 0 10px", lineHeight: 1.5 }}>
+                    {checkInOutput.summary}
+                  </p>
+                  {checkInOutput.cues.length > 0 && (
+                    <ul
+                      style={{
+                        margin: "0 0 10px",
+                        paddingLeft: 20,
+                        lineHeight: 1.5,
+                        fontSize: 14,
+                      }}
+                    >
+                      {checkInOutput.cues.map((cue, i) => (
+                        <li key={i}>{cue}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p style={{ margin: 0, fontSize: 13, color: "var(--watch)" }}>
+                    {checkInOutput.safety_note}
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

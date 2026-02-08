@@ -76,6 +76,7 @@ async def coach_set(body: SetSummaryRequest):
             rep_count=body.rep_count,
             reps=[r.model_dump() for r in body.reps],
             set_level_summary=body.set_level_summary.model_dump() if body.set_level_summary is not None else None,
+            coach_mode=body.coach_mode,
         )
         return output
     except Exception as e:

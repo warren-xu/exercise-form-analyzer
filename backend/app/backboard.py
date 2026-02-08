@@ -16,13 +16,21 @@ from backboard import (
 
 from .schemas import AssistantOutput
 
+# Encouraging check-in during the live set (e.g. every 10 reps).
+COACH_SYSTEM_PROMPT_CHECK_IN = """You are a supportive gym coach checking in during the user's set. Your role is to:
+1. Check in with the user and encourage them.
+2. Give brief, actionable advice based on the single most critical issue provided (depth, knee tracking, torso angle, heel lift, or asymmetry).
+3. Keep responses short and motivating.
 
-COACH_SYSTEM_PROMPT = """You are a concise gym coach assistant. You receive structured squat form analysis (depth, knee tracking, torso angle, heel lift, asymmetry) and respond with:
-1. A 1–2 sentence summary of the main takeaway.
-2. 2–4 prioritized, actionable cues (short phrases).
-3. If tracking confidence was low, add a short confidence_note suggesting the user keep feet and knees visible in frame.
+Respond in JSON only, with keys: summary, cues (array of 2–4 short phrases), safety_note. Do not mention tracking confidence, camera, or visibility. No markdown, no code fence."""
 
-Respond in JSON only, with keys: summary, cues (array of strings), safety_note, confidence_note (optional string). No markdown, no code fence."""
+# Full set summary when the user ends the session.
+COACH_SYSTEM_PROMPT_SET_SUMMARY = """You are a concise gym coach. The user has finished their squat set and wants a session summary. You receive structured form analysis (depth, knee tracking, torso angle, heel lift, asymmetry) for each rep. Your role is to:
+1. Give a 1–2 sentence overall takeaway for the set.
+2. Provide 2–4 prioritized, actionable cues for the next session.
+3. Be direct and helpful; no fluff.
+
+Respond in JSON only, with keys: summary, cues (array of 2–4 short phrases), safety_note. Do not mention tracking confidence, camera, or visibility. No markdown, no code fence."""
 
 
 def _build_set_coach_message(
@@ -78,10 +86,17 @@ def _fallback_output(reason: str, detail: str = "") -> AssistantOutput:
     )
 
 
+def _get_system_prompt(coach_mode: str) -> str:
+    if coach_mode == "check_in":
+        return COACH_SYSTEM_PROMPT_CHECK_IN
+    return COACH_SYSTEM_PROMPT_SET_SUMMARY
+
+
 async def get_set_coach_response(
     rep_count: int,
     reps: list,
     set_level_summary: dict | None = None,
+    coach_mode: str = "set_summary",
 ) -> AssistantOutput:
     api_key = os.environ.get("BACKBOARD_API_KEY")
     if not api_key:
@@ -95,13 +110,14 @@ async def get_set_coach_response(
     content = _build_set_coach_message(rep_count, reps, set_level_summary)
     llm_provider = os.environ.get("BACKBOARD_LLM_PROVIDER", "openai")
     model_name = os.environ.get("BACKBOARD_MODEL", "gpt-4o-mini")
+    system_prompt = _get_system_prompt(coach_mode)
 
     try:
         client = BackboardClient(api_key=api_key)
 
         assistant = await client.create_assistant(
             name="Squat Form Coach",
-            system_prompt=COACH_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
         )
 
         thread = await client.create_thread(assistant.assistant_id)
