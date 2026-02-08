@@ -264,6 +264,8 @@ export default function App() {
     if (reps.length === 0) return;
     setAssistantLoading(true);
     setAssistantError(null);
+    setPhase("SetSummary");
+    stopCamera();
     try {
       const token = await getAccessTokenSilently().catch(() => undefined);
       const idClaims = await getIdTokenClaims().catch(() => undefined);
@@ -317,8 +319,6 @@ export default function App() {
       console.log("=".repeat(80) + "\n");
 
       setAssistantOutput(output);
-      setPhase("SetSummary");
-      stopCamera();
     } catch (e) {
       setAssistantError(e instanceof Error ? e.message : "Request failed");
     } finally {
