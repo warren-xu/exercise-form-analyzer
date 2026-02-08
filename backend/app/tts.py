@@ -3,7 +3,6 @@ ElevenLabs text-to-speech integration.
 Converts coaching feedback text to audio using ElevenLabs API.
 """
 import os
-from io import BytesIO
 
 import httpx
 
@@ -16,7 +15,7 @@ print(f"[TTS] API Key length: {len(ELEVENLABS_API_KEY) if ELEVENLABS_API_KEY els
 print(f"[TTS] Voice ID: {ELEVENLABS_VOICE_ID}")
 
 
-async def text_to_speech(text: str) -> bytes | None:
+async def text_to_speech(text: str, voice_id: str | None = None) -> bytes | None:
     """
     Convert text to speech using ElevenLabs API.
     Returns MP3 audio bytes, or None if API key is not configured.
@@ -33,7 +32,8 @@ async def text_to_speech(text: str) -> bytes | None:
     if not text or not text.strip():
         return None
     
-    url = f"{ELEVENLABS_BASE_URL}/text-to-speech/{ELEVENLABS_VOICE_ID}"
+    resolved_voice_id = voice_id or ELEVENLABS_VOICE_ID
+    url = f"{ELEVENLABS_BASE_URL}/text-to-speech/{resolved_voice_id}"
     
     headers = {
         "xi-api-key": ELEVENLABS_API_KEY,
@@ -48,7 +48,7 @@ async def text_to_speech(text: str) -> bytes | None:
         },
     }
     
-    return None  # COMMENT OUT THIS LINE TO ENABLE TTS
+    #return None  # COMMENT OUT THIS LINE TO ENABLE TTS
     
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:

@@ -9,7 +9,10 @@ const API_BASE = '/api';
  * Generate audio from text via the backend TTS endpoint.
  * Returns the audio as a Blob that can be played.
  */
-export async function generateAudio(text: string): Promise<Blob | null> {
+export async function generateAudio(
+  text: string,
+  voiceId?: string,
+): Promise<Blob | null> {
   if (!text || !text.trim()) {
     return null;
   }
@@ -18,7 +21,7 @@ export async function generateAudio(text: string): Promise<Blob | null> {
     const response = await fetch(`${API_BASE}/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, voice_id: voiceId }),
     });
 
     if (!response.ok) {
@@ -65,8 +68,11 @@ export function playAudio(blob: Blob): void {
  * Generate and play audio from text.
  * Combines generateAudio and playAudio.
  */
-export async function generateAndPlayAudio(text: string): Promise<void> {
-  const blob = await generateAudio(text);
+export async function generateAndPlayAudio(
+  text: string,
+  voiceId?: string,
+): Promise<void> {
+  const blob = await generateAudio(text, voiceId);
   if (blob) {
     playAudio(blob);
   }

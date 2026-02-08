@@ -60,3 +60,4 @@ class ErrorDetail(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=5000)
+    voice_id: Optional[str] = None

@@ -339,7 +339,7 @@ async def delete_session(
 async def generate_audio(body: TTSRequest):
     """Generate audio from text using ElevenLabs."""
     try:
-        audio_bytes = await text_to_speech(body.text)
+        audio_bytes = await text_to_speech(body.text, body.voice_id)
         if audio_bytes is None:
             raise HTTPException(
                 status_code=502,
